@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: hub-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: teamhub
+    ports:
+      - "5432:5432"
+    volumes:
+      - hub-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d teamhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  hub-pg-data:

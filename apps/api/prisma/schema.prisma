@@ -1,5 +1,11 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model User {
   id           String   @id @default(cuid())
@@ -30,7 +36,10 @@ model Workspace {
   invites     Invite[]
 }
 
-enum Role { ADMIN MEMBER }
+enum Role {
+  ADMIN
+  MEMBER
+}
 
 model Membership {
   id          String   @id @default(cuid())
@@ -54,7 +63,12 @@ model Invite {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
-enum GoalStatus { NOT_STARTED IN_PROGRESS COMPLETED ARCHIVED }
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
 
 model Goal {
   id           String   @id @default(cuid())
@@ -123,8 +137,19 @@ model Reaction {
   @@unique([announcementId, userId, emoji])
 }
 
-enum Priority { LOW MEDIUM HIGH URGENT }
-enum ItemStatus { TODO IN_PROGRESS REVIEW DONE }
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ItemStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
 
 model ActionItem {
   id          String   @id @default(cuid())
