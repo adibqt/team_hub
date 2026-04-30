@@ -1,8 +1,31 @@
 import { create } from "zustand";
 import api from "@/lib/api";
 
+/* ────────────────────────────────────────────────────────────────
+   Helpers — keep the list and detail caches consistent. Every
+   milestone mutation maps over `goals` AND `goalById` so whichever
+   view the user is looking at sees the same data.
+   ──────────────────────────────────────────────────────────────── */
+
+function patchGoalMilestones(state, goalId, mutator) {
+  const apply = (g) => {
+    if (!g || g.id !== goalId) return g;
+    return { ...g, milestones: mutator(g.milestones || []) };
+  };
+  return {
+    goals: state.goals.map(apply),
+    goalById: state.goalById[goalId]
+      ? { ...state.goalById, [goalId]: apply(state.goalById[goalId]) }
+      : state.goalById,
+  };
+}
+
 export const useGoalsStore = create((set, get) => ({
   goals: [],
+  goalById: {},          // detailed goal cache, keyed by id
+  updatesByGoalId: {},   // activity feed, keyed by goalId
+
+  /* ────────────────────────  GOAL LIST  ──────────────────────── */
 
   load: async (wsId) => {
     const { data } = await api.get(`/api/workspaces/${wsId}/goals`);
@@ -10,9 +33,6 @@ export const useGoalsStore = create((set, get) => ({
     return data;
   },
 
-  // Used by socket listeners. Idempotent: if a goal with the same id is
-  // already present (e.g. we just created it optimistically and the realtime
-  // event arrived after the REST round-trip), this is a no-op.
   pushGoal: (goal) => {
     if (!goal?.id) return;
     if (get().goals.some((g) => g.id === goal.id)) return;
@@ -31,13 +51,169 @@ export const useGoalsStore = create((set, get) => ({
     set({ goals: [optimistic, ...get().goals] });
     try {
       const { data } = await api.post(`/api/workspaces/${wsId}/goals`, draft);
-      set({
-        goals: get().goals.map((g) => (g.id === tempId ? data : g)),
+      // Idempotent merge: drop the optimistic placeholder AND any prior
+      // copy of the real id that may have been inserted by an early
+      // `goal:created` socket echo, then prepend the canonical one.
+      set((state) => {
+        const cleaned = state.goals.filter(
+          (g) => g.id !== tempId && g.id !== data.id
+        );
+        return { goals: [data, ...cleaned] };
       });
       return data;
     } catch (err) {
       set({ goals: get().goals.filter((g) => g.id !== tempId) });
       throw err;
     }
+  },
+
+  /* ────────────────────────  GOAL DETAIL  ──────────────────────── */
+
+  loadGoal: async (id) => {
+    const { data } = await api.get(`/api/goals/${id}`);
+    set((state) => ({ goalById: { ...state.goalById, [id]: data } }));
+    return data;
+  },
+
+  /* ────────────────────────  MILESTONES  ──────────────────────── */
+
+  createMilestone: async (goalId, draft) => {
+    const { data } = await api.post(`/api/goals/${goalId}/milestones`, draft);
+    set((state) =>
+      patchGoalMilestones(state, goalId, (ms) => {
+        if (ms.some((m) => m.id === data.id)) return ms;
+        return [...ms, data];
+      })
+    );
+    return data;
+  },
+
+  updateMilestone: async (milestoneId, goalId, patch) => {
+    // Optimistic — flip progress/title locally first so the slider feels alive.
+    const previous = get()
+      .goals.flatMap((g) => g.milestones || [])
+      .concat(
+        Object.values(get().goalById).flatMap((g) => g?.milestones || [])
+      )
+      .find((m) => m?.id === milestoneId);
+
+    set((state) =>
+      patchGoalMilestones(state, goalId, (ms) =>
+        ms.map((m) => (m.id === milestoneId ? { ...m, ...patch } : m))
+      )
+    );
+
+    try {
+      const { data } = await api.patch(`/api/milestones/${milestoneId}`, patch);
+      set((state) =>
+        patchGoalMilestones(state, goalId, (ms) =>
+          ms.map((m) => (m.id === milestoneId ? data : m))
+        )
+      );
+      return data;
+    } catch (err) {
+      // Roll back to the previous snapshot on failure.
+      if (previous) {
+        set((state) =>
+          patchGoalMilestones(state, goalId, (ms) =>
+            ms.map((m) => (m.id === milestoneId ? previous : m))
+          )
+        );
+      }
+      throw err;
+    }
+  },
+
+  deleteMilestone: async (milestoneId, goalId) => {
+    const snapshot = get()
+      .goals.find((g) => g.id === goalId)
+      ?.milestones?.find((m) => m.id === milestoneId);
+
+    set((state) =>
+      patchGoalMilestones(state, goalId, (ms) =>
+        ms.filter((m) => m.id !== milestoneId)
+      )
+    );
+
+    try {
+      await api.delete(`/api/milestones/${milestoneId}`);
+    } catch (err) {
+      // Restore on failure.
+      if (snapshot) {
+        set((state) =>
+          patchGoalMilestones(state, goalId, (ms) =>
+            ms.some((m) => m.id === snapshot.id) ? ms : [...ms, snapshot]
+          )
+        );
+      }
+      throw err;
+    }
+  },
+
+  // Socket handlers — idempotent so a server echo of our own mutation
+  // doesn't double-insert or clobber an in-flight optimistic edit.
+  pushMilestone: (m) => {
+    if (!m?.id || !m.goalId) return;
+    set((state) =>
+      patchGoalMilestones(state, m.goalId, (ms) =>
+        ms.some((x) => x.id === m.id) ? ms : [...ms, m]
+      )
+    );
+  },
+  patchMilestoneFromSocket: (m) => {
+    if (!m?.id || !m.goalId) return;
+    set((state) =>
+      patchGoalMilestones(state, m.goalId, (ms) =>
+        ms.map((x) => (x.id === m.id ? { ...x, ...m } : x))
+      )
+    );
+  },
+  removeMilestoneFromSocket: ({ id, goalId }) => {
+    if (!id || !goalId) return;
+    set((state) =>
+      patchGoalMilestones(state, goalId, (ms) => ms.filter((m) => m.id !== id))
+    );
+  },
+
+  /* ────────────────────────  ACTIVITY FEED  ──────────────────────── */
+
+  loadUpdates: async (goalId) => {
+    const { data } = await api.get(`/api/goals/${goalId}/updates`);
+    set((state) => ({
+      updatesByGoalId: { ...state.updatesByGoalId, [goalId]: data },
+    }));
+    return data;
+  },
+
+  postUpdate: async (goalId, body) => {
+    const { data } = await api.post(`/api/goals/${goalId}/updates`, { body });
+    // Idempotent by id — the realtime socket can echo the same update
+    // back to us before this response resolves, in which case `pushUpdate`
+    // has already inserted it. Don't double-add.
+    set((state) => {
+      const existing = state.updatesByGoalId[goalId] || [];
+      if (existing.some((u) => u.id === data.id)) return {};
+      return {
+        updatesByGoalId: {
+          ...state.updatesByGoalId,
+          [goalId]: [data, ...existing],
+        },
+      };
+    });
+    return data;
+  },
+
+  pushUpdate: (update) => {
+    if (!update?.id || !update.goalId) return;
+    set((state) => {
+      const existing = state.updatesByGoalId[update.goalId] || [];
+      if (existing.some((u) => u.id === update.id)) return {};
+      return {
+        updatesByGoalId: {
+          ...state.updatesByGoalId,
+          [update.goalId]: [update, ...existing],
+        },
+      };
+    });
   },
 }));

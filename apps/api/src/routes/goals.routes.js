@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
-import { requireAuth, requireMember } from "../middleware/auth.js";
+import {
+  requireAuth,
+  requireMember,
+  requireGoalMember,
+} from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
 
 const r = Router();
@@ -83,34 +87,184 @@ r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, ne
   } catch (e) { next(e); }
 });
 
-r.patch("/goals/:id", requireAuth, async (req, res, next) => {
+/* ─────────────────────────────────────────────
+   READ a single goal (with owner + milestones)
+   ───────────────────────────────────────────── */
+r.get("/goals/:id", requireAuth, requireGoalMember, async (req, res, next) => {
   try {
-    const before = await prisma.goal.findUnique({ where: { id: req.params.id } });
-    const goal = await prisma.goal.update({ where: { id: req.params.id }, data: req.body });
-    await logAudit({ workspaceId: goal.workspaceId, actorId: req.userId, action: "goal.update", entity: { type: "Goal", id: goal.id }, before, after: goal });
+    const goal = await prisma.goal.findUnique({
+      where: { id: req.params.id },
+      include: {
+        owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        milestones: { orderBy: { id: "asc" } },
+      },
+    });
+    res.json(goal);
+  } catch (e) { next(e); }
+});
+
+/* ─────────────────────────────────────────────
+   UPDATE a goal — title, description, owner, dueDate, status
+   ───────────────────────────────────────────── */
+r.patch("/goals/:id", requireAuth, requireGoalMember, async (req, res, next) => {
+  try {
+    const { title, description, ownerId, dueDate, status } = req.body || {};
+    const data = {};
+
+    if (title !== undefined) {
+      if (typeof title !== "string" || !title.trim()) {
+        return res.status(400).json({ error: "Title cannot be empty" });
+      }
+      data.title = title.trim();
+    }
+    if (description !== undefined) {
+      data.description =
+        typeof description === "string" && description.trim()
+          ? description.trim()
+          : null;
+    }
+    if (status !== undefined) {
+      if (!VALID_STATUSES.includes(status)) {
+        return res
+          .status(400)
+          .json({ error: `status must be one of ${VALID_STATUSES.join(", ")}` });
+      }
+      data.status = status;
+    }
+    if (dueDate !== undefined) {
+      if (dueDate === null || dueDate === "") {
+        data.dueDate = null;
+      } else {
+        const d = new Date(dueDate);
+        if (Number.isNaN(d.getTime())) {
+          return res.status(400).json({ error: "Invalid due date" });
+        }
+        data.dueDate = d;
+      }
+    }
+    if (ownerId !== undefined && ownerId !== req.goal.ownerId) {
+      const ownerMembership = await prisma.membership.findUnique({
+        where: {
+          userId_workspaceId: { userId: ownerId, workspaceId: req.workspaceId },
+        },
+      });
+      if (!ownerMembership) {
+        return res
+          .status(400)
+          .json({ error: "Owner must be a member of this workspace" });
+      }
+      data.ownerId = ownerId;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: "Nothing to update" });
+    }
+
+    const before = req.goal;
+    const goal = await prisma.goal.update({
+      where: { id: req.params.id },
+      data,
+      include: {
+        owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        milestones: true,
+      },
+    });
+
+    await logAudit({
+      workspaceId: goal.workspaceId,
+      actorId: req.userId,
+      action: "goal.update",
+      entity: { type: "Goal", id: goal.id },
+      before: {
+        title: before.title,
+        description: before.description,
+        ownerId: before.ownerId,
+        dueDate: before.dueDate,
+        status: before.status,
+      },
+      after: {
+        title: goal.title,
+        description: goal.description,
+        ownerId: goal.ownerId,
+        dueDate: goal.dueDate,
+        status: goal.status,
+      },
+    });
+
     const io = req.app.get("io");
     io.to(`ws:${goal.workspaceId}`).emit("goal:updated", goal);
     res.json(goal);
   } catch (e) { next(e); }
 });
 
-r.post("/goals/:id/updates", requireAuth, async (req, res, next) => {
-  try {
-    const update = await prisma.goalUpdate.create({
-      data: { goalId: req.params.id, authorId: req.userId, body: req.body.body },
-    });
-    res.status(201).json(update);
-  } catch (e) { next(e); }
-});
+/* ─────────────────────────────────────────────
+   ACTIVITY FEED — post a progress update on a goal
+   ───────────────────────────────────────────── */
+r.post(
+  "/goals/:id/updates",
+  requireAuth,
+  requireGoalMember,
+  async (req, res, next) => {
+    try {
+      const { body } = req.body || {};
+      if (!body || typeof body !== "string" || !body.trim()) {
+        return res.status(400).json({ error: "Update body cannot be empty" });
+      }
+      if (body.trim().length > 5000) {
+        return res
+          .status(400)
+          .json({ error: "Update body must be 5000 characters or fewer" });
+      }
 
-r.get("/goals/:id/updates", requireAuth, async (req, res, next) => {
-  try {
-    const updates = await prisma.goalUpdate.findMany({
-      where: { goalId: req.params.id },
-      orderBy: { createdAt: "desc" },
-    });
-    res.json(updates);
-  } catch (e) { next(e); }
-});
+      const update = await prisma.goalUpdate.create({
+        data: {
+          goalId: req.params.id,
+          authorId: req.userId,
+          body: body.trim(),
+        },
+        include: {
+          author: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        },
+      });
+
+      await logAudit({
+        workspaceId: req.workspaceId,
+        actorId: req.userId,
+        action: "goal.update.post",
+        entity: { type: "GoalUpdate", id: update.id },
+        after: { goalId: update.goalId, body: update.body },
+      });
+
+      const io = req.app.get("io");
+      io.to(`ws:${req.workspaceId}`).emit("goal:update:posted", {
+        ...update,
+        workspaceId: req.workspaceId,
+      });
+
+      res.status(201).json(update);
+    } catch (e) { next(e); }
+  }
+);
+
+/* ─────────────────────────────────────────────
+   ACTIVITY FEED — list updates (newest first)
+   ───────────────────────────────────────────── */
+r.get(
+  "/goals/:id/updates",
+  requireAuth,
+  requireGoalMember,
+  async (req, res, next) => {
+    try {
+      const updates = await prisma.goalUpdate.findMany({
+        where: { goalId: req.params.id },
+        orderBy: { createdAt: "desc" },
+        include: {
+          author: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        },
+      });
+      res.json(updates);
+    } catch (e) { next(e); }
+  }
+);
 
 export default r;

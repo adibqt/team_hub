@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import {
   Plus,
   Target,
   CalendarDays,
   Clock4,
   ShieldCheck,
+  ArrowUpRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useGoalsStore } from "@/stores/goalsStore";
@@ -65,6 +67,9 @@ export default function GoalsPage() {
   const { workspaceId } = useParams();
   const me = useAuthStore((s) => s.user);
   const { goals, load, pushGoal } = useGoalsStore();
+  const pushMilestone = useGoalsStore((s) => s.pushMilestone);
+  const patchMilestoneFromSocket = useGoalsStore((s) => s.patchMilestoneFromSocket);
+  const removeMilestoneFromSocket = useGoalsStore((s) => s.removeMilestoneFromSocket);
   const ws = useWorkspaceStore((s) => s.workspaceById[workspaceId]);
   const loadOne = useWorkspaceStore((s) => s.loadOne);
 
@@ -82,12 +87,29 @@ export default function GoalsPage() {
     const s = getSocket();
     s.emit("workspace:join", workspaceId);
     const onCreated = (g) => pushGoal(g);
+    const onMilestoneCreated = (m) => pushMilestone(m);
+    const onMilestoneUpdated = (m) => patchMilestoneFromSocket(m);
+    const onMilestoneDeleted = (p) => removeMilestoneFromSocket(p);
     s.on("goal:created", onCreated);
+    s.on("milestone:created", onMilestoneCreated);
+    s.on("milestone:updated", onMilestoneUpdated);
+    s.on("milestone:deleted", onMilestoneDeleted);
     return () => {
       mounted = false;
       s.off("goal:created", onCreated);
+      s.off("milestone:created", onMilestoneCreated);
+      s.off("milestone:updated", onMilestoneUpdated);
+      s.off("milestone:deleted", onMilestoneDeleted);
     };
-  }, [workspaceId, load, loadOne, pushGoal]);
+  }, [
+    workspaceId,
+    load,
+    loadOne,
+    pushGoal,
+    pushMilestone,
+    patchMilestoneFromSocket,
+    removeMilestoneFromSocket,
+  ]);
 
   const accent = ws?.accentColor || "#D34F1F";
 
@@ -206,6 +228,9 @@ export default function GoalsPage() {
               const due = dueLabel(g.dueDate);
               const progress = avgMilestoneProgress(g.milestones);
               const isMine = g.ownerId === me?.id;
+              const goalHref = g._pending
+                ? null
+                : `/w/${workspaceId}/goals/${g.id}`;
               return (
                 <li
                   key={g.id}
@@ -219,9 +244,24 @@ export default function GoalsPage() {
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <h2 className="font-display italic text-xl leading-tight tracking-tight text-ink">
-                        {g.title}
-                      </h2>
+                      {goalHref ? (
+                        <Link
+                          href={goalHref}
+                          className="group/title inline-flex items-baseline gap-2 font-display italic text-xl leading-tight tracking-tight text-ink hover:text-ember/90 focus:outline-none focus-visible:underline transition-colors"
+                        >
+                          <span>{g.title}</span>
+                          <ArrowUpRight
+                            size={14}
+                            strokeWidth={1.75}
+                            aria-hidden="true"
+                            className="text-ink/35 transition-all group-hover/title:text-ember group-hover/title:translate-x-0.5 group-hover/title:-translate-y-0.5"
+                          />
+                        </Link>
+                      ) : (
+                        <h2 className="font-display italic text-xl leading-tight tracking-tight text-ink">
+                          {g.title}
+                        </h2>
+                      )}
                       {g._pending && (
                         <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45">
                           filing…

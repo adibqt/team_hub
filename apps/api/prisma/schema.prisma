@@ -20,6 +20,7 @@ model User {
   comments     Comment[]
   reactions    Reaction[]
   auditEntries AuditLog[]
+  goalUpdates  GoalUpdate[]
 }
 
 model Workspace {
@@ -101,6 +102,8 @@ model GoalUpdate {
   body      String
   createdAt DateTime @default(now())
   goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id])
+  @@index([goalId, createdAt])
 }
 
 model Announcement {
