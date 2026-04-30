@@ -46,41 +46,66 @@ export default function UserMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-400/50"
+        className={clsx(
+          "w-full flex items-center gap-3 px-2.5 py-2.5 transition-colors",
+          "border border-ink/10 hover:border-ink/30 bg-paper-50 hover:bg-paper-200/60",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+        )}
       >
-        <Avatar user={user} size="md" />
+        <Avatar user={user} size="sm" />
         <div className="flex-1 min-w-0 text-left">
-          <p className="text-sm font-medium text-white truncate">{user.name}</p>
-          <p className="text-xs text-slate-400 truncate">{user.email}</p>
+          <p className="text-[13px] leading-tight font-medium text-ink truncate">
+            {user.name}
+          </p>
+          <p className="font-mono text-[10px] tracking-wider text-ink/50 truncate mt-0.5">
+            {user.email}
+          </p>
         </div>
         <ChevronUp
-          size={16}
-          className={clsx("text-slate-400 transition-transform", open ? "rotate-0" : "rotate-180")}
+          size={14}
+          strokeWidth={1.75}
+          className={clsx(
+            "text-ink/45 transition-transform shrink-0",
+            open ? "rotate-0" : "rotate-180"
+          )}
+          aria-hidden="true"
         />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute bottom-full left-0 right-0 mb-2 rounded-xl bg-slate-800 border border-white/10 shadow-2xl overflow-hidden animate-fade-up"
+          className="absolute bottom-full left-0 right-0 mb-2 bg-ink text-paper border border-ink overflow-hidden animate-fade-up shadow-[0_-8px_24px_-12px_rgba(15,15,18,0.45)]"
         >
+          <div className="px-3 pt-3 pb-2 border-b border-paper/10">
+            <p className="font-mono text-[10px] uppercase tracking-widest2 text-paper/45">
+              Signed in as
+            </p>
+            <p className="mt-0.5 text-sm font-medium text-paper truncate">{user.name}</p>
+          </div>
           <Link
             href="/profile"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-200 hover:bg-white/5 transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 text-sm text-paper/85 hover:bg-paper/10 hover:text-paper transition-colors"
           >
-            <UserCircle2 size={16} className="text-slate-400" />
-            Your profile
+            <UserCircle2 size={15} strokeWidth={1.75} className="text-paper/60" />
+            <span>Your profile</span>
+            <span className="ml-auto font-mono text-[10px] tracking-widest2 text-paper/35">
+              ↗
+            </span>
           </Link>
           <button
             type="button"
             role="menuitem"
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-rose-300 hover:bg-rose-500/10 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-ember-200 hover:bg-ember/15 hover:text-ember-100 transition-colors border-t border-paper/10"
           >
-            <LogOut size={16} />
-            Sign out
+            <LogOut size={15} strokeWidth={1.75} />
+            <span>Sign out</span>
+            <span className="ml-auto font-mono text-[10px] tracking-widest2 text-paper/35">
+              ⌘⇧Q
+            </span>
           </button>
         </div>
       )}

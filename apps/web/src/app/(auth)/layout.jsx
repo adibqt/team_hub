@@ -1,19 +1,22 @@
 import Link from "next/link";
-import { Layers, Target, MessageSquare, ShieldCheck } from "lucide-react";
+import ActivityTicker from "@/components/auth/ActivityTicker";
+
+const VOLUME = String(new Date().getFullYear()).slice(-2);
+const ISSUE = String(Math.ceil((new Date().getMonth() + 1) / 3)).padStart(2, "0");
 
 const FEATURES = [
   {
-    icon: Target,
+    n: "01",
     title: "Goals that don't slip",
     body: "Milestone-tracked OKRs with progress sliders and an activity feed every owner actually reads.",
   },
   {
-    icon: MessageSquare,
+    n: "02",
     title: "Real-time, not real-noisy",
     body: "Live presence, instant updates, and @mentions that route to the right inbox — over WebSockets.",
   },
   {
-    icon: ShieldCheck,
+    n: "03",
     title: "Audit-ready by default",
     body: "Every mutation is captured immutably. Filter by actor, export to CSV, and pass review boards in minutes.",
   },
@@ -21,72 +24,129 @@ const FEATURES = [
 
 export default function AuthLayout({ children }) {
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50">
-      {/* ================= BRAND PANEL ================= */}
-      <aside className="relative overflow-hidden lg:flex-1 lg:w-1/2 bg-slate-950 text-white">
-        {/* animated mesh blobs */}
-        <div className="absolute inset-0 -z-0">
-          <div className="absolute -top-32 -left-24 w-[28rem] h-[28rem] rounded-full bg-brand-600/40 blur-3xl animate-blob-1" />
-          <div className="absolute top-1/3 -right-32 w-[26rem] h-[26rem] rounded-full bg-violet-500/30 blur-3xl animate-blob-2" />
-          <div className="absolute -bottom-24 left-1/4 w-[24rem] h-[24rem] rounded-full bg-fuchsia-500/25 blur-3xl animate-blob-3" />
-        </div>
-        {/* dot grid */}
-        <div className="absolute inset-0 bg-grid-faint bg-grid-24 opacity-60 -z-0" />
-        {/* gradient veil to keep text legible */}
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950/70 via-slate-950/20 to-slate-950/80 -z-0" />
+    <div className="relative min-h-screen flex flex-col lg:grid lg:grid-cols-12 bg-paper text-ink">
+      {/* paper grain over the entire surface */}
+      <div className="grain" aria-hidden="true" />
 
-        <div className="relative z-10 flex flex-col h-full min-h-[280px] lg:min-h-screen p-8 lg:p-14">
-          {/* logo */}
-          <Link href="/" className="inline-flex items-center gap-2.5 group w-fit">
-            <span className="grid place-items-center h-9 w-9 rounded-xl bg-gradient-to-br from-brand-500 to-fuchsia-500 shadow-lg shadow-brand-500/30 group-hover:shadow-brand-500/50 transition-shadow">
-              <Layers size={18} strokeWidth={2.5} className="text-white" />
+      {/* ============================================================
+          MASTHEAD — full width, mono, rules above & below
+         ============================================================ */}
+      <header className="lg:col-span-12 relative z-10 px-6 sm:px-10 lg:px-14 pt-6 sm:pt-8">
+        <div className="flex items-end justify-between gap-6 pb-4 border-b border-ink/15">
+          <Link href="/" className="group/logo flex items-baseline gap-3">
+            <span
+              aria-hidden="true"
+              className="font-display italic text-2xl leading-none text-ink"
+            >
+              T<span className="text-ember">·</span>H
             </span>
-            <span className="font-semibold tracking-tight text-lg">Team Hub</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55 hidden sm:inline">
+              The Team Hub
+            </span>
           </Link>
 
-          {/* hero content - hidden on small screens */}
-          <div className="hidden lg:flex flex-1 flex-col justify-center max-w-xl mt-10 animate-fade-up">
-            <span className="inline-flex items-center gap-2 self-start text-xs font-medium px-3 py-1 rounded-full border border-white/15 bg-white/5 backdrop-blur-sm">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-slate-300">Live in your workspace</span>
+          <div className="flex items-center gap-5 font-mono text-[10px] uppercase tracking-widest2 text-ink/55">
+            <span className="hidden md:inline">
+              VOL.&nbsp;{VOLUME} <span className="text-ink/25">/</span> ISSUE&nbsp;{ISSUE}
             </span>
-
-            <h1 className="mt-6 text-4xl xl:text-5xl font-bold tracking-tight leading-[1.1]">
-              Where teams
-              <br />
-              <span className="bg-gradient-to-r from-brand-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">
-                ship together.
+            <span className="hidden md:inline-block h-3 w-px bg-ink/15" aria-hidden="true" />
+            <span className="flex items-center gap-2">
+              <span className="relative inline-flex h-1.5 w-1.5">
+                <span className="absolute inset-0 rounded-full bg-ember animate-ping opacity-50" />
+                <span className="relative h-1.5 w-1.5 rounded-full bg-ember" />
               </span>
-            </h1>
-            <p className="mt-5 text-slate-300/90 text-lg leading-relaxed">
-              Goals, action items, announcements, and an immutable audit trail —
-              all in one workspace your team will actually open every day.
-            </p>
-
-            <ul className="mt-10 space-y-5">
-              {FEATURES.map(({ icon: Icon, title, body }) => (
-                <li key={title} className="flex gap-4">
-                  <span className="mt-0.5 grid place-items-center h-9 w-9 shrink-0 rounded-lg bg-white/5 border border-white/10 backdrop-blur-sm">
-                    <Icon size={17} className="text-brand-300" />
-                  </span>
-                  <div>
-                    <p className="font-medium text-white">{title}</p>
-                    <p className="text-sm text-slate-400 mt-0.5 leading-relaxed">{body}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+              LIVE
+            </span>
           </div>
-
-          <p className="hidden lg:block text-xs text-slate-500 mt-8">
-            &copy; {new Date().getFullYear()} Team Hub. Crafted for collaborative teams.
-          </p>
         </div>
+      </header>
+
+      {/* ============================================================
+          EDITORIAL PANEL (left)
+         ============================================================ */}
+      <aside className="relative z-10 lg:col-span-7 px-6 sm:px-10 lg:px-14 py-10 lg:py-14 lg:border-r lg:border-ink/15 flex flex-col">
+        {/* tag */}
+        <div className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55 flex items-center gap-3 animate-fade-in">
+          <span aria-hidden="true" className="inline-block h-px w-8 bg-ink/40" />
+          A field manual for shipping teams
+        </div>
+
+        {/* MASSIVE editorial headline */}
+        <h1 className="mt-8 lg:mt-10 font-display text-[clamp(2.75rem,7vw,6rem)] leading-[0.95] tracking-[-0.02em] text-ink animate-fade-up">
+          <span className="block font-light">Where</span>
+          <span className="block italic font-normal pl-[0.6em]">
+            teams<span className="text-ember">.</span>
+          </span>
+          <span className="block font-medium">
+            ship&nbsp;
+            <span className="relative inline-block">
+              together
+              <span
+                aria-hidden="true"
+                className="absolute left-0 right-0 -bottom-1 h-[3px] bg-ember origin-left animate-rule-grow"
+                style={{ animationDelay: "0.6s" }}
+              />
+            </span>
+          </span>
+        </h1>
+
+        <p
+          className="mt-7 max-w-xl text-[15px] leading-[1.7] text-ink/70 animate-fade-up"
+          style={{ animationDelay: "0.15s" }}
+        >
+          Goals, action items, announcements, and an immutable audit trail —
+          one workspace your team will actually open every day. No flair you
+          don't need; every pixel earns its place.
+        </p>
+
+        {/* numbered features */}
+        <ol
+          className="mt-12 lg:mt-16 space-y-7 lg:space-y-8 max-w-xl animate-fade-up"
+          style={{ animationDelay: "0.3s" }}
+        >
+          {FEATURES.map(({ n, title, body }, i) => (
+            <li key={n} className="grid grid-cols-[auto_1fr] gap-x-6 lg:gap-x-8">
+              <span
+                aria-hidden="true"
+                className="font-mono text-[11px] tracking-widest2 text-ember-600 pt-1.5"
+              >
+                {n}
+              </span>
+              <div>
+                <h3 className="font-display italic text-xl lg:text-2xl tracking-tight text-ink">
+                  {title}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink/65">{body}</p>
+                {i < FEATURES.length - 1 && (
+                  <div className="hairline text-ink/20 mt-7" aria-hidden="true" />
+                )}
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {/* live ticker — fills any remaining vertical space, anchored to bottom */}
+        <ActivityTicker />
       </aside>
 
-      {/* ================= FORM PANEL ================= */}
-      <main className="flex-1 flex items-center justify-center p-6 sm:p-10 lg:p-12">
-        <div className="w-full max-w-md animate-fade-up">{children}</div>
+      {/* ============================================================
+          FORM PANEL (right)
+         ============================================================ */}
+      <main className="relative z-10 lg:col-span-5 px-6 sm:px-10 lg:px-12 py-10 lg:py-14 flex flex-col items-center">
+        <div className="w-full max-w-md flex-1 flex flex-col">
+          {children}
+        </div>
+
+        {/* footer rule */}
+        <div className="mt-12 w-full max-w-md">
+          <div className="hairline text-ink/20 mb-3" aria-hidden="true" />
+          <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45 flex items-center justify-between gap-4">
+            <span>&copy; {new Date().getFullYear()} Team Hub</span>
+            <span className="hidden sm:inline">
+              Crafted on paper <span className="text-ember">·</span> shipped to web
+            </span>
+          </p>
+        </div>
       </main>
     </div>
   );

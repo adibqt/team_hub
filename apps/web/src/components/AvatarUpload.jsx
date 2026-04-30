@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { Camera, Loader2, Upload } from "lucide-react";
+import { Camera, Loader2, Upload, FileImage } from "lucide-react";
 import toast from "react-hot-toast";
 import clsx from "clsx";
 import api from "@/lib/api";
@@ -51,22 +51,37 @@ export default function AvatarUpload() {
   }
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-      <div className="relative shrink-0">
-        <Avatar user={user} size="xl" className="ring-4 ring-white shadow-lg" />
+    <div className="flex flex-col sm:flex-row sm:items-stretch gap-6">
+      {/* Avatar block — square stamp with corner camera button */}
+      <div className="relative shrink-0 self-start">
+        <Avatar user={user} size="xl" className="ring-1 ring-ink/15" />
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           aria-label="Change avatar"
-          className="absolute -bottom-1 -right-1 grid place-items-center h-9 w-9 rounded-full bg-gradient-to-br from-brand-600 to-violet-600 text-white shadow-md ring-4 ring-white hover:scale-105 transition-transform focus:outline-none focus:ring-4 focus:ring-brand-200 disabled:opacity-70"
+          className={clsx(
+            "absolute -bottom-2 -right-2 grid place-items-center h-9 w-9",
+            "bg-ink text-paper hover:bg-ember transition-colors",
+            "ring-2 ring-paper",
+            "focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+            "disabled:opacity-70 disabled:cursor-not-allowed"
+          )}
         >
-          {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+          {uploading ? (
+            <Loader2 size={15} strokeWidth={1.75} className="animate-spin" />
+          ) : (
+            <Camera size={15} strokeWidth={1.75} />
+          )}
         </button>
       </div>
 
+      {/* Drop target — hairline border, ember on drag */}
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
@@ -79,25 +94,42 @@ export default function AvatarUpload() {
           }
         }}
         className={clsx(
-          "flex-1 cursor-pointer rounded-xl border-2 border-dashed px-5 py-4 transition-all",
-          "focus:outline-none focus:ring-2 focus:ring-brand-200",
+          "flex-1 cursor-pointer relative px-5 py-5 transition-colors",
+          "border border-dashed",
+          "focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
           dragOver
-            ? "border-brand-400 bg-brand-50"
-            : "border-slate-200 hover:border-brand-300 hover:bg-slate-50"
+            ? "border-ember bg-ember-50/40"
+            : "border-ink/25 hover:border-ink/55 bg-paper-50/60 hover:bg-paper-100"
         )}
       >
-        <div className="flex items-center gap-3">
-          <span className={clsx(
-            "grid place-items-center h-10 w-10 rounded-lg shrink-0 transition-colors",
-            dragOver ? "bg-brand-100 text-brand-600" : "bg-slate-100 text-slate-500"
-          )}>
-            <Upload size={18} />
+        {/* corner mono caption */}
+        <span className="absolute top-3 right-4 font-mono text-[10px] uppercase tracking-widest2 text-ink/40">
+          Drop · Or browse
+        </span>
+
+        <div className="flex items-center gap-4 pr-24 sm:pr-0">
+          <span
+            className={clsx(
+              "grid place-items-center h-11 w-11 shrink-0 transition-colors",
+              dragOver
+                ? "bg-ember text-paper"
+                : "bg-ink/5 text-ink/55"
+            )}
+            aria-hidden="true"
+          >
+            {dragOver ? (
+              <FileImage size={18} strokeWidth={1.75} />
+            ) : (
+              <Upload size={18} strokeWidth={1.75} />
+            )}
           </span>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-900">
+            <p className="font-display italic text-lg leading-tight text-ink">
               {dragOver ? "Drop to upload" : "Click or drag a photo here"}
             </p>
-            <p className="text-xs text-slate-500 mt-0.5">JPG, PNG, or WebP — up to 5 MB</p>
+            <p className="mt-1 font-mono text-[10px] uppercase tracking-widest2 text-ink/45">
+              JPG · PNG · WebP <span className="text-ink/25">/</span> Max 5 MB
+            </p>
           </div>
         </div>
       </div>

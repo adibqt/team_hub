@@ -1,11 +1,25 @@
-import { Inter } from "next/font/google";
+import { Fraunces, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
-const inter = Inter({
+const fraunces = Fraunces({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-inter",
+  variable: "--font-display",
+  axes: ["opsz", "SOFT"],
+  style: ["normal", "italic"],
+});
+
+const interTight = Inter_Tight({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-sans",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-mono",
 });
 
 export const metadata = {
@@ -15,14 +29,24 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="font-sans antialiased">
+    <html
+      lang="en"
+      className={`${fraunces.variable} ${interTight.variable} ${jetbrainsMono.variable}`}
+    >
+      <body className="font-sans antialiased bg-paper text-ink">
         {children}
         <Toaster
           position="top-right"
           toastOptions={{
-            style: { borderRadius: "12px", background: "#1e293b", color: "#fff" },
-            success: { iconTheme: { primary: "#a78bfa", secondary: "#1e293b" } },
+            style: {
+              borderRadius: "2px",
+              background: "#0F0F12",
+              color: "#F5F1E8",
+              fontFamily: "var(--font-mono)",
+              fontSize: "13px",
+              letterSpacing: "0.01em",
+            },
+            success: { iconTheme: { primary: "#D34F1F", secondary: "#0F0F12" } },
           }}
         />
       </body>

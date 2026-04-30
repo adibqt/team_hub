@@ -1,11 +1,10 @@
 "use client";
-import { Check, X } from "lucide-react";
 import clsx from "clsx";
 
 const RULES = [
-  { id: "len",   label: "At least 8 characters", test: (p) => p.length >= 8 },
-  { id: "case",  label: "Mix of upper & lower case", test: (p) => /[a-z]/.test(p) && /[A-Z]/.test(p) },
-  { id: "num",   label: "Contains a number",        test: (p) => /\d/.test(p) },
+  { id: "len",  label: "8+ characters",     test: (p) => p.length >= 8 },
+  { id: "case", label: "Aa mixed case",     test: (p) => /[a-z]/.test(p) && /[A-Z]/.test(p) },
+  { id: "num",  label: "0-9 number",        test: (p) => /\d/.test(p) },
 ];
 
 export function getStrength(password) {
@@ -14,10 +13,10 @@ export function getStrength(password) {
 }
 
 const LEVEL = [
-  { label: "",        bar: "",                   text: "" },
-  { label: "Weak",    bar: "bg-rose-400 w-1/3",  text: "text-rose-600" },
-  { label: "Decent",  bar: "bg-amber-400 w-2/3", text: "text-amber-600" },
-  { label: "Strong",  bar: "bg-emerald-500 w-full", text: "text-emerald-600" },
+  { label: "—",      bar: "w-0",     text: "text-ink/35",     dash: "bg-ink/15" },
+  { label: "WEAK",   bar: "w-1/3",   text: "text-ember-700",  dash: "bg-ember-500" },
+  { label: "DECENT", bar: "w-2/3",   text: "text-ember-500",  dash: "bg-ember-400" },
+  { label: "STRONG", bar: "w-full",  text: "text-sage-600",   dash: "bg-sage" },
 ];
 
 export default function PasswordStrength({ password }) {
@@ -26,36 +25,48 @@ export default function PasswordStrength({ password }) {
   const showRules = password.length > 0;
 
   return (
-    <div aria-live="polite" className="mt-2 space-y-2">
+    <div aria-live="polite" className="mt-3 space-y-2.5">
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+        <div className="flex-1 h-px bg-ink/10 relative overflow-hidden">
           <div
-            className={clsx("h-full rounded-full transition-all duration-300", level.bar)}
-            style={{ minWidth: score > 0 ? "8px" : "0" }}
+            className={clsx(
+              "absolute inset-y-0 left-0 transition-all duration-500 ease-out",
+              level.bar,
+              level.dash
+            )}
+            style={{ height: "1px" }}
           />
         </div>
-        {showRules && (
-          <span className={clsx("text-xs font-semibold tabular-nums", level.text)}>
-            {level.label}
-          </span>
-        )}
+        <span
+          className={clsx(
+            "font-mono text-[10px] tracking-widest2 tabular-nums",
+            showRules ? level.text : "text-ink/30"
+          )}
+        >
+          {showRules ? `STRENGTH · ${level.label}` : "STRENGTH · —"}
+        </span>
       </div>
+
       {showRules && (
-        <ul className="space-y-1">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-widest2">
           {RULES.map((rule) => {
             const pass = rule.test(password);
             return (
-              <li key={rule.id} className="flex items-center gap-2 text-xs">
+              <li
+                key={rule.id}
+                className={clsx(
+                  "flex items-center gap-1.5 transition-colors",
+                  pass ? "text-sage-600" : "text-ink/35"
+                )}
+              >
                 <span
-                  className={clsx(
-                    "flex h-4 w-4 items-center justify-center rounded-full transition-colors",
-                    pass ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-400"
-                  )}
                   aria-hidden="true"
-                >
-                  {pass ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
-                </span>
-                <span className={pass ? "text-slate-600" : "text-slate-400"}>{rule.label}</span>
+                  className={clsx(
+                    "inline-block h-px w-3 transition-colors",
+                    pass ? "bg-sage" : "bg-ink/20"
+                  )}
+                />
+                <span>{rule.label}</span>
               </li>
             );
           })}

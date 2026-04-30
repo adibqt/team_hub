@@ -2,27 +2,27 @@ import clsx from "clsx";
 
 const SIZES = {
   xs: "h-6 w-6 text-[10px]",
-  sm: "h-8 w-8 text-xs",
-  md: "h-10 w-10 text-sm",
-  lg: "h-14 w-14 text-base",
+  sm: "h-8 w-8 text-[11px]",
+  md: "h-10 w-10 text-[12px]",
+  lg: "h-14 w-14 text-sm",
   xl: "h-24 w-24 text-2xl",
 };
 
-// Deterministic gradient picked from the user id/name so the same user
-// always gets the same colored avatar fallback.
-const GRADIENTS = [
-  "from-brand-500 to-violet-500",
-  "from-violet-500 to-fuchsia-500",
-  "from-emerald-500 to-cyan-500",
-  "from-amber-500 to-rose-500",
-  "from-cyan-500 to-brand-500",
-  "from-rose-500 to-fuchsia-500",
+// Editorial palette — solid stamp blocks, never gradients.
+// Each option is paired with a contrast text class so initials stay legible.
+const STAMPS = [
+  "bg-ink text-paper",
+  "bg-ember text-paper",
+  "bg-sage-500 text-paper",
+  "bg-ember-700 text-paper",
+  "bg-sage-600 text-paper",
+  "bg-ink-200 text-paper",
 ];
 
-function pickGradient(seed = "") {
+function pickStamp(seed = "") {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return GRADIENTS[h % GRADIENTS.length];
+  return STAMPS[h % STAMPS.length];
 }
 
 function initials(name = "") {
@@ -35,14 +35,14 @@ function initials(name = "") {
 export default function Avatar({ user, size = "md", className }) {
   const sz = SIZES[size] || SIZES.md;
   const seed = user?.id || user?.email || user?.name || "";
-  const gradient = pickGradient(seed);
+  const stamp = pickStamp(seed);
 
   if (user?.avatarUrl) {
     return (
       <img
         src={user.avatarUrl}
         alt={user.name || "User avatar"}
-        className={clsx(sz, "rounded-full object-cover ring-2 ring-white shadow-sm", className)}
+        className={clsx(sz, "object-cover ring-1 ring-ink/15", className)}
       />
     );
   }
@@ -52,8 +52,8 @@ export default function Avatar({ user, size = "md", className }) {
       aria-label={user?.name || "User avatar"}
       className={clsx(
         sz,
-        "rounded-full bg-gradient-to-br grid place-items-center font-semibold text-white ring-2 ring-white shadow-sm select-none",
-        gradient,
+        "grid place-items-center font-mono font-medium tracking-wider select-none ring-1 ring-ink/10",
+        stamp,
         className
       )}
     >
