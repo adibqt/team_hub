@@ -15,7 +15,10 @@ r.post("/register", async (req, res, next) => {
       .cookie("access",  access,  { ...cookieOpts, maxAge: 15 * 60 * 1000 })
       .cookie("refresh", refresh, { ...cookieOpts, maxAge: 7 * 24 * 3600 * 1000 })
       .json({ id: user.id, email: user.email, name: user.name });
-  } catch (e) { next(e); }
+  } catch (e) {
+    if (e?.code === "P2002") return res.status(409).json({ error: "Email already in use" });
+    next(e);
+  }
 });
 
 r.post("/login", async (req, res, next) => {
