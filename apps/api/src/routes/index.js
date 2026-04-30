@@ -14,11 +14,14 @@ const r = Router();
 r.use("/auth", authRoutes);
 r.use("/users", usersRoutes);
 r.use("/workspaces", workspacesRoutes);
-r.use("/goals", goalsRoutes);
-r.use("/milestones", milestonesRoutes);
-r.use("/announcements", announcementsRoutes);
-r.use("/items", actionItemsRoutes);
 r.use("/workspaces", analyticsRoutes);
 r.use("/workspaces", auditRoutes);
+
+// These route files use absolute paths internally (e.g. "/workspaces/:wsId/goals",
+// "/goals/:id", "/announcements/:id/reactions"), so they're mounted at root.
+r.use("/", goalsRoutes);
+r.use("/", milestonesRoutes);
+r.use("/", announcementsRoutes);
+r.use("/", actionItemsRoutes);
 
 export default r;
