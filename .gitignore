@@ -12,4 +12,5 @@ coverage
 
 # Ignore all .env files except .env.example
 !.env.example
-env.js  
+
+ 
