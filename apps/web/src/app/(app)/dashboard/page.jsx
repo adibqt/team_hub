@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowUpRight, Plus, Layers } from "lucide-react";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useAuthStore } from "@/stores/authStore";
+import CreateWorkspaceModal from "@/components/workspaces/CreateWorkspaceModal";
 
 const TODAY = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
@@ -21,6 +22,7 @@ export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const { workspaces, load } = useWorkspaceStore();
   const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -33,8 +35,8 @@ export default function DashboardPage() {
     };
   }, [load]);
 
-  const ownerCount = workspaces.filter((w) => w.role === "OWNER").length;
-  const memberCount = workspaces.length - ownerCount;
+  const adminCount = workspaces.filter((w) => w.role === "ADMIN").length;
+  const memberCount = workspaces.length - adminCount;
 
   return (
     <div className="relative max-w-[1200px] mx-auto px-6 sm:px-10 lg:px-14 py-10 lg:py-14">
@@ -78,7 +80,7 @@ export default function DashboardPage() {
         style={{ animationDelay: "0.1s" }}
       >
         <Stat n="01" label="Workspaces" value={loading ? "—" : workspaces.length} />
-        <Stat n="02" label="Owner of"   value={loading ? "—" : ownerCount} />
+        <Stat n="02" label="Admin of"   value={loading ? "—" : adminCount} />
         <Stat n="03" label="Member of"  value={loading ? "—" : memberCount} />
         <Stat n="04" label="Status"     value={<LiveDot />} mono />
       </section>
@@ -100,15 +102,27 @@ export default function DashboardPage() {
               <span className="font-light">workspaces</span>
             </h2>
           </div>
-          <p className="hidden sm:block font-mono text-[10px] uppercase tracking-widest2 text-ink/40 tabular-nums">
-            {loading ? "loading…" : `${workspaces.length} on file`}
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="hidden sm:block font-mono text-[10px] uppercase tracking-widest2 text-ink/40 tabular-nums">
+              {loading ? "loading…" : `${workspaces.length} on file`}
+            </p>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex items-center gap-2.5 bg-ink text-paper px-4 py-2.5 hover:bg-ink-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+            >
+              <Plus size={14} strokeWidth={2} aria-hidden="true" />
+              <span className="font-mono text-[10px] uppercase tracking-widest2">
+                New workspace
+              </span>
+            </button>
+          </div>
         </div>
 
         {loading ? (
           <SkeletonGrid />
         ) : workspaces.length === 0 ? (
-          <EmptyState />
+          <EmptyState onCreate={() => setCreateOpen(true)} />
         ) : (
           <ul className="mt-8 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px bg-ink/15">
             {workspaces.map((ws, i) => (
@@ -131,6 +145,8 @@ export default function DashboardPage() {
           </span>
         </p>
       </footer>
+
+      <CreateWorkspaceModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );
 }
@@ -256,7 +272,7 @@ function SkeletonGrid() {
   );
 }
 
-function EmptyState() {
+function EmptyState({ onCreate }) {
   return (
     <div className="mt-10 relative border border-ink/15 bg-paper-50">
       <div className="absolute -top-px left-0 h-px w-24 bg-ember" aria-hidden="true" />
@@ -270,17 +286,16 @@ function EmptyState() {
             <span className="italic font-normal">Yet<span className="text-ember">.</span></span>
           </h3>
           <p className="mt-4 text-sm leading-relaxed text-ink/65">
-            When you create a workspace — or get pulled into one by a teammate —
-            it'll dock here. Until then, the bench is yours alone.
+            Spin up a fresh ledger for your team — pick a name, a colour, and you're in.
+            Or hold the line for an invitation from a teammate.
           </p>
         </div>
 
         <div className="lg:pl-10 lg:border-l border-ink/15">
           <button
             type="button"
-            disabled
-            title="Workspace creation coming soon"
-            className="inline-flex items-center gap-3 bg-ink text-paper px-5 py-3.5 text-sm font-medium tracking-wide opacity-60 cursor-not-allowed"
+            onClick={onCreate}
+            className="inline-flex items-center gap-3 bg-ink text-paper px-5 py-3.5 hover:bg-ink-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper-50"
           >
             <Plus size={15} strokeWidth={2} aria-hidden="true" />
             <span className="font-mono text-[10px] uppercase tracking-widest2">
@@ -289,7 +304,7 @@ function EmptyState() {
           </button>
           <p className="mt-3 font-mono text-[10px] uppercase tracking-widest2 text-ink/40 flex items-center gap-2">
             <Layers size={11} strokeWidth={1.75} className="text-ember" aria-hidden="true" />
-            Wired up next sprint
+            Takes about 30 seconds
           </p>
         </div>
       </div>

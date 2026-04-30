@@ -1,15 +1,23 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, User, ArrowRight, AlertOctagon } from "lucide-react";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import FormField from "@/components/auth/FormField";
 import PasswordStrength, { getStrength } from "@/components/auth/PasswordStrength";
 
+function safeNext(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get("next"));
   const setUser = useAuthStore((s) => s.setUser);
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -28,7 +36,7 @@ export default function RegisterPage() {
     try {
       const { data } = await api.post("/api/auth/register", form);
       setUser(data);
-      router.replace("/dashboard");
+      router.replace(next || "/dashboard");
     } catch (err) {
       const apiMsg = err?.response?.data?.error;
       setError(
@@ -57,7 +65,7 @@ export default function RegisterPage() {
         <p className="mt-3 text-sm leading-relaxed text-ink/65 max-w-sm">
           Already with us?{" "}
           <Link
-            href="/login"
+            href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
             className="group/link inline-flex items-baseline gap-1 text-ink font-medium border-b border-ink/30 hover:border-ember pb-px transition-colors"
           >
             Sign in instead

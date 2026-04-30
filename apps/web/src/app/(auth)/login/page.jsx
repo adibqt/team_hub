@@ -1,14 +1,23 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail, Lock, ArrowRight, AlertOctagon } from "lucide-react";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import FormField from "@/components/auth/FormField";
 
+// Only allow same-origin paths (prevents open redirects).
+function safeNext(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
+  return raw;
+}
+
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = safeNext(searchParams.get("next"));
   const setUser = useAuthStore((s) => s.setUser);
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -21,7 +30,7 @@ export default function LoginPage() {
     try {
       const { data } = await api.post("/api/auth/login", form);
       setUser(data);
-      router.replace("/dashboard");
+      router.replace(next || "/dashboard");
     } catch (err) {
       const status = err?.response?.status;
       setError(
@@ -50,7 +59,7 @@ export default function LoginPage() {
         <p className="mt-3 text-sm leading-relaxed text-ink/65 max-w-sm">
           New to the workbench?{" "}
           <Link
-            href="/register"
+            href={next ? `/register?next=${encodeURIComponent(next)}` : "/register"}
             className="group/link inline-flex items-baseline gap-1 text-ink font-medium border-b border-ink/30 hover:border-ember pb-px transition-colors"
           >
             Open an account
