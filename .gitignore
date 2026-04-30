@@ -1,0 +1,15 @@
+node_modules
+.env
+.env.local
+.turbo
+dist
+.next
+build
+*.log
+.DS_Store
+.idea
+coverage
+
+# Ignore all .env files except .env.example
+!.env.example
+env.js  

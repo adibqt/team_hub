@@ -1,0 +1,9 @@
+{
+  "name": "@team-hub/config",
+  "version": "1.0.0",
+  "private": true,
+  "exports": {
+    "./eslint": "./eslint.js",
+    "./tailwind": "./tailwind.js"
+  }
+}

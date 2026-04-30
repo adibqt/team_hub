@@ -1,0 +1,12 @@
+{
+  "name": "@team-hub/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "zod": "^3.22.0"
+  }
+}
