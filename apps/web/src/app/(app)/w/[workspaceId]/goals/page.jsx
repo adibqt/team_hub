@@ -7,7 +7,6 @@ import {
   Target,
   CalendarDays,
   Clock4,
-  ShieldCheck,
   ArrowUpRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -17,20 +16,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { getSocket } from "@/lib/socket";
 import Avatar from "@/components/ui/Avatar";
 import CreateGoalModal from "@/components/goals/CreateGoalModal";
-
-const STATUS_LABEL = {
-  NOT_STARTED: "Not started",
-  IN_PROGRESS: "In progress",
-  COMPLETED: "Completed",
-  ARCHIVED: "Archived",
-};
-
-const STATUS_TONE = {
-  NOT_STARTED: "text-ink/65 border-ink/20 bg-paper",
-  IN_PROGRESS: "text-ember border-ember/40 bg-ember-50",
-  COMPLETED: "text-sage-700 border-sage-500/40 bg-sage-50",
-  ARCHIVED: "text-ink/45 border-ink/15 bg-paper-50",
-};
+import GoalStatusPicker from "@/components/goals/GoalStatusPicker";
 
 function fmtDate(d) {
   if (!d) return null;
@@ -67,6 +53,8 @@ export default function GoalsPage() {
   const { workspaceId } = useParams();
   const me = useAuthStore((s) => s.user);
   const { goals, load, pushGoal } = useGoalsStore();
+  const updateGoal = useGoalsStore((s) => s.updateGoal);
+  const applyGoalUpdate = useGoalsStore((s) => s.applyGoalUpdate);
   const pushMilestone = useGoalsStore((s) => s.pushMilestone);
   const patchMilestoneFromSocket = useGoalsStore((s) => s.patchMilestoneFromSocket);
   const removeMilestoneFromSocket = useGoalsStore((s) => s.removeMilestoneFromSocket);
@@ -87,16 +75,19 @@ export default function GoalsPage() {
     const s = getSocket();
     s.emit("workspace:join", workspaceId);
     const onCreated = (g) => pushGoal(g);
+    const onUpdated = (g) => applyGoalUpdate(g);
     const onMilestoneCreated = (m) => pushMilestone(m);
     const onMilestoneUpdated = (m) => patchMilestoneFromSocket(m);
     const onMilestoneDeleted = (p) => removeMilestoneFromSocket(p);
     s.on("goal:created", onCreated);
+    s.on("goal:updated", onUpdated);
     s.on("milestone:created", onMilestoneCreated);
     s.on("milestone:updated", onMilestoneUpdated);
     s.on("milestone:deleted", onMilestoneDeleted);
     return () => {
       mounted = false;
       s.off("goal:created", onCreated);
+      s.off("goal:updated", onUpdated);
       s.off("milestone:created", onMilestoneCreated);
       s.off("milestone:updated", onMilestoneUpdated);
       s.off("milestone:deleted", onMilestoneDeleted);
@@ -106,6 +97,7 @@ export default function GoalsPage() {
     load,
     loadOne,
     pushGoal,
+    applyGoalUpdate,
     pushMilestone,
     patchMilestoneFromSocket,
     removeMilestoneFromSocket,
@@ -332,14 +324,38 @@ export default function GoalsPage() {
                   </div>
 
                   <div className="flex flex-col items-end gap-2 pt-1">
-                    <span
-                      className={`inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest2 px-2.5 py-1.5 border ${STATUS_TONE[g.status] || STATUS_TONE.NOT_STARTED}`}
-                    >
-                      {g.status === "COMPLETED" && (
-                        <ShieldCheck size={11} strokeWidth={1.75} />
-                      )}
-                      {STATUS_LABEL[g.status] || g.status}
-                    </span>
+                    {(() => {
+                      const isOwner = g.ownerId === me?.id;
+                      const isAdmin = ws?.viewerRole === "ADMIN";
+                      const canEdit = !g._pending && (isOwner || isAdmin);
+                      return (
+                        <GoalStatusPicker
+                          value={g.status}
+                          size="sm"
+                          disabled={!canEdit}
+                          disabledReason={
+                            g._pending
+                              ? "Saving the goal — try again in a moment"
+                              : canEdit
+                              ? undefined
+                              : "Only the goal's owner or a workspace admin can change status"
+                          }
+                          onChange={async (next) => {
+                            try {
+                              await updateGoal(g.id, { status: next });
+                              toast.success(
+                                `Status set to ${next.replace("_", " ").toLowerCase()}`
+                              );
+                            } catch (err) {
+                              toast.error(
+                                err?.response?.data?.error ||
+                                  "Couldn't change status."
+                              );
+                            }
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
                 </li>
               );

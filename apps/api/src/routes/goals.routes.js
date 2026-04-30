@@ -129,6 +129,20 @@ r.patch("/goals/:id", requireAuth, requireGoalMember, async (req, res, next) => 
           .status(400)
           .json({ error: `status must be one of ${VALID_STATUSES.join(", ")}` });
       }
+      // Status transitions are restricted to the goal's owner or a
+      // workspace admin. Other PATCH fields stay open to any member so
+      // routine cleanups (typos in description, dueDate slips) don't
+      // require chasing down an admin.
+      if (status !== req.goal.status) {
+        const isOwner = req.goal.ownerId === req.userId;
+        const isAdmin = req.membership.role === "ADMIN";
+        if (!isOwner && !isAdmin) {
+          return res.status(403).json({
+            error:
+              "Only the goal's owner or a workspace admin can change its status",
+          });
+        }
+      }
       data.status = status;
     }
     if (dueDate !== undefined) {

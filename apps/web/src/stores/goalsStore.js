@@ -75,6 +75,68 @@ export const useGoalsStore = create((set, get) => ({
     return data;
   },
 
+  // Patch a goal (title / description / owner / dueDate / status). Optimistic
+  // local merge first so the UI flips instantly; rolls back on failure. We
+  // intentionally preserve the local `milestones` array — milestones have
+  // their own socket events and the PATCH response can be slightly stale.
+  updateGoal: async (id, patch) => {
+    const snapshot =
+      get().goalById[id] || get().goals.find((g) => g.id === id) || null;
+
+    const mergeLocal = (state, source) => {
+      const merge = (g) => {
+        if (!g || g.id !== id) return g;
+        return { ...g, ...source, milestones: g.milestones ?? source.milestones };
+      };
+      return {
+        goals: state.goals.map(merge),
+        goalById: state.goalById[id]
+          ? { ...state.goalById, [id]: merge(state.goalById[id]) }
+          : state.goalById,
+      };
+    };
+
+    set((state) => mergeLocal(state, patch));
+
+    try {
+      const { data } = await api.patch(`/api/goals/${id}`, patch);
+      set((state) => mergeLocal(state, data));
+      return data;
+    } catch (err) {
+      if (snapshot) {
+        set((state) => {
+          const restore = (g) => (g?.id === id ? snapshot : g);
+          return {
+            goals: state.goals.map(restore),
+            goalById: state.goalById[id]
+              ? { ...state.goalById, [id]: snapshot }
+              : state.goalById,
+          };
+        });
+      }
+      throw err;
+    }
+  },
+
+  // Socket handler for `goal:updated`. Idempotent — applying our own echo
+  // is harmless because the merged result is identical to what we already
+  // wrote optimistically.
+  applyGoalUpdate: (goal) => {
+    if (!goal?.id) return;
+    set((state) => {
+      const merge = (g) => {
+        if (!g || g.id !== goal.id) return g;
+        return { ...g, ...goal, milestones: g.milestones ?? goal.milestones };
+      };
+      return {
+        goals: state.goals.map(merge),
+        goalById: state.goalById[goal.id]
+          ? { ...state.goalById, [goal.id]: merge(state.goalById[goal.id]) }
+          : state.goalById,
+      };
+    });
+  },
+
   /* ────────────────────────  MILESTONES  ──────────────────────── */
 
   createMilestone: async (goalId, draft) => {
