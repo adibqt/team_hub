@@ -1,30 +1,80 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireMember } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
 
 const r = Router();
 
-r.post("/workspaces/:wsId/goals", requireAuth, async (req, res, next) => {
+const VALID_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ARCHIVED"];
+
+r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, next) => {
   try {
-    const { title, description, ownerId, dueDate, status } = req.body;
-    const goal = await prisma.goal.create({
-      data: { workspaceId: req.params.wsId, title, description, ownerId: ownerId || req.userId, dueDate, status },
-      include: { owner: { select: { id: true, name: true, avatarUrl: true } }, milestones: true },
+    const { title, description, ownerId, dueDate, status } = req.body || {};
+
+    if (!title || typeof title !== "string" || !title.trim()) {
+      return res.status(400).json({ error: "Title is required" });
+    }
+    if (title.trim().length > 200) {
+      return res.status(400).json({ error: "Title must be 200 characters or fewer" });
+    }
+    if (status && !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ error: `status must be one of ${VALID_STATUSES.join(", ")}` });
+    }
+
+    let parsedDueDate = null;
+    if (dueDate) {
+      const d = new Date(dueDate);
+      if (Number.isNaN(d.getTime())) {
+        return res.status(400).json({ error: "Invalid due date" });
+      }
+      parsedDueDate = d;
+    }
+
+    // Owner must be a member of this workspace. Defaults to the creator.
+    const resolvedOwnerId = ownerId || req.userId;
+    const ownerMembership = await prisma.membership.findUnique({
+      where: { userId_workspaceId: { userId: resolvedOwnerId, workspaceId: req.params.wsId } },
     });
-    await logAudit({ workspaceId: req.params.wsId, actorId: req.userId, action: "goal.create", entity: { type: "Goal", id: goal.id }, after: goal });
+    if (!ownerMembership) {
+      return res.status(400).json({ error: "Owner must be a member of this workspace" });
+    }
+
+    const goal = await prisma.goal.create({
+      data: {
+        workspaceId: req.params.wsId,
+        title: title.trim(),
+        description: description?.trim() || null,
+        ownerId: resolvedOwnerId,
+        dueDate: parsedDueDate,
+        status: status || "NOT_STARTED",
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        milestones: true,
+      },
+    });
+    await logAudit({
+      workspaceId: req.params.wsId,
+      actorId: req.userId,
+      action: "goal.create",
+      entity: { type: "Goal", id: goal.id },
+      after: { title: goal.title, ownerId: goal.ownerId, status: goal.status, dueDate: goal.dueDate },
+    });
     const io = req.app.get("io");
     io.to(`ws:${req.params.wsId}`).emit("goal:created", goal);
     res.status(201).json(goal);
   } catch (e) { next(e); }
 });
 
-r.get("/workspaces/:wsId/goals", requireAuth, async (req, res, next) => {
+r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, next) => {
   try {
     const { page = 1, take = 20 } = req.query;
     const goals = await prisma.goal.findMany({
       where: { workspaceId: req.params.wsId },
-      include: { owner: { select: { id: true, name: true, avatarUrl: true } }, milestones: true },
+      include: {
+        owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        milestones: true,
+      },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * Number(take),
       take: Number(take),
