@@ -1,78 +1,422 @@
 import { Router } from "express";
 import sanitizeHtml from "sanitize-html";
 import { prisma } from "../config/prisma.js";
-import { requireAuth } from "../middleware/auth.js";
+import {
+  requireAuth,
+  requireMember,
+  requireAdmin,
+} from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
 
 const r = Router();
 
-r.post("/workspaces/:wsId/announcements", requireAuth, async (req, res, next) => {
-  try {
-    const { title, bodyHtml } = req.body;
-    const announcement = await prisma.announcement.create({
-      data: { workspaceId: req.params.wsId, authorId: req.userId, title, bodyHtml: sanitizeHtml(bodyHtml) },
-    });
-    await logAudit({ workspaceId: req.params.wsId, actorId: req.userId, action: "announcement.create", entity: { type: "Announcement", id: announcement.id }, after: announcement });
-    const io = req.app.get("io");
-    io.to(`ws:${req.params.wsId}`).emit("announcement:created", announcement);
-    res.status(201).json(announcement);
-  } catch (e) { next(e); }
-});
+/* ─────────────────────────────────────────────
+   Rich-text sanitisation
+   ─────────────────────────────────────────────
+   Editor produces standard HTML from TipTap's StarterKit. We allow the
+   semantic subset needed for an announcement (headings, lists, quotes,
+   inline emphasis, code, links) and strip everything else. URLs are
+   restricted to safe schemes and links always carry rel/target so an
+   admin can never publish content that hijacks a member's session.
+*/
+const ALLOWED_TAGS = [
+  "p", "br", "hr",
+  "h1", "h2", "h3", "h4",
+  "strong", "em", "u", "s",
+  "blockquote",
+  "ul", "ol", "li",
+  "code", "pre",
+  "a",
+];
 
-r.get("/workspaces/:wsId/announcements", requireAuth, async (req, res, next) => {
+const SANITIZE_OPTIONS = {
+  allowedTags: ALLOWED_TAGS,
+  allowedAttributes: {
+    a: ["href", "title", "target", "rel"],
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+  allowedSchemesAppliedToAttributes: ["href"],
+  transformTags: {
+    a: sanitizeHtml.simpleTransform("a", {
+      target: "_blank",
+      rel: "noopener noreferrer nofollow",
+    }),
+  },
+};
+
+function cleanHtml(input = "") {
+  return sanitizeHtml(String(input), SANITIZE_OPTIONS).trim();
+}
+
+// HTML must contain *some* visible content after sanitisation. TipTap
+// emits "<p></p>" for an empty doc, which would otherwise pass.
+function hasContent(html) {
+  return html.replace(/<[^>]*>/g, "").trim().length > 0;
+}
+
+const AUTHOR_FIELDS = { id: true, name: true, avatarUrl: true };
+
+/* The Announcement model doesn't declare a Prisma relation to User
+   (only an `authorId` column), so we hydrate authors with a single
+   secondary query and merge before responding. */
+async function attachAuthor(announcement) {
+  if (!announcement) return announcement;
+  const author = await prisma.user.findUnique({
+    where: { id: announcement.authorId },
+    select: AUTHOR_FIELDS,
+  });
+  return { ...announcement, author };
+}
+
+async function attachAuthors(list) {
+  if (!list?.length) return list;
+  const ids = [...new Set(list.map((a) => a.authorId))];
+  const users = await prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: AUTHOR_FIELDS,
+  });
+  const byId = new Map(users.map((u) => [u.id, u]));
+  return list.map((a) => ({ ...a, author: byId.get(a.authorId) || null }));
+}
+
+async function loadAnnouncementForFeed(id) {
+  const announcement = await prisma.announcement.findUnique({
+    where: { id },
+    include: {
+      comments: {
+        include: {
+          author: { select: AUTHOR_FIELDS },
+        },
+        orderBy: { createdAt: "asc" },
+      },
+      reactions: true,
+    },
+  });
+  return attachAuthor(announcement);
+}
+
+async function loadForMember(req, res) {
+  const announcement = await prisma.announcement.findUnique({
+    where: { id: req.params.id },
+  });
+  if (!announcement) {
+    res.status(404).json({ error: "Announcement not found" });
+    return null;
+  }
+  const membership = await prisma.membership.findUnique({
+    where: {
+      userId_workspaceId: {
+        userId: req.userId,
+        workspaceId: announcement.workspaceId,
+      },
+    },
+  });
+  if (!membership) {
+    res.status(403).json({ error: "Not a member of this workspace" });
+    return null;
+  }
+  return announcement;
+}
+
+// Resolve an announcement and verify the caller's membership/role for
+// routes mounted at /announcements/:id (where wsId isn't in the path).
+async function loadForAdmin(req, res) {
+  const announcement = await prisma.announcement.findUnique({
+    where: { id: req.params.id },
+  });
+  if (!announcement) {
+    res.status(404).json({ error: "Announcement not found" });
+    return null;
+  }
+  const membership = await prisma.membership.findUnique({
+    where: {
+      userId_workspaceId: {
+        userId: req.userId,
+        workspaceId: announcement.workspaceId,
+      },
+    },
+  });
+  if (!membership) {
+    res.status(403).json({ error: "Not a member of this workspace" });
+    return null;
+  }
+  if (membership.role !== "ADMIN") {
+    res.status(403).json({ error: "Admin role required" });
+    return null;
+  }
+  return announcement;
+}
+
+/* ─────────────────────────────────────────────
+   CREATE — admin only
+   ───────────────────────────────────────────── */
+
+r.post(
+  "/workspaces/:wsId/announcements",
+  requireAuth,
+  requireMember,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const { title, bodyHtml, pinned } = req.body || {};
+      const cleanTitle = typeof title === "string" ? title.trim() : "";
+      if (!cleanTitle) return res.status(400).json({ error: "Title is required" });
+      if (cleanTitle.length > 200)
+        return res.status(400).json({ error: "Title is too long (max 200)" });
+
+      const cleaned = cleanHtml(bodyHtml);
+      if (!hasContent(cleaned))
+        return res.status(400).json({ error: "Body can't be empty" });
+
+      const announcement = await prisma.announcement.create({
+        data: {
+          workspaceId: req.params.wsId,
+          authorId: req.userId,
+          title: cleanTitle,
+          bodyHtml: cleaned,
+          pinned: pinned === true,
+        },
+      });
+      const hydrated = await attachAuthor(announcement);
+
+      await logAudit({
+        workspaceId: req.params.wsId,
+        actorId: req.userId,
+        action: "announcement.create",
+        entity: { type: "Announcement", id: announcement.id },
+        after: { title: announcement.title, pinned: announcement.pinned },
+      });
+
+      const io = req.app.get("io");
+      io.to(`ws:${req.params.wsId}`).emit("announcement:created", hydrated);
+
+      res.status(201).json(hydrated);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+/* ─────────────────────────────────────────────
+   LIST — any workspace member
+   ───────────────────────────────────────────── */
+
+r.get(
+  "/workspaces/:wsId/announcements",
+  requireAuth,
+  requireMember,
+  async (req, res, next) => {
+    try {
+      const announcements = await prisma.announcement.findMany({
+        where: { workspaceId: req.params.wsId },
+        include: {
+          comments: {
+            include: {
+              author: { select: AUTHOR_FIELDS },
+            },
+            orderBy: { createdAt: "asc" },
+          },
+          reactions: true,
+        },
+        orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+      });
+      const hydrated = await attachAuthors(announcements);
+      res.json(hydrated);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+/* ─────────────────────────────────────────────
+   UPDATE / DELETE / PIN — admin only
+   ───────────────────────────────────────────── */
+
+r.patch("/announcements/:id", requireAuth, async (req, res, next) => {
   try {
-    const announcements = await prisma.announcement.findMany({
-      where: { workspaceId: req.params.wsId },
-      include: { comments: { include: { author: { select: { id: true, name: true, avatarUrl: true } } } }, reactions: true },
-      orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+    const before = await loadForAdmin(req, res);
+    if (!before) return;
+
+    const data = {};
+    if (typeof req.body?.title === "string") {
+      const t = req.body.title.trim();
+      if (!t) return res.status(400).json({ error: "Title can't be empty" });
+      if (t.length > 200)
+        return res.status(400).json({ error: "Title is too long (max 200)" });
+      data.title = t;
+    }
+    if (typeof req.body?.bodyHtml === "string") {
+      const cleaned = cleanHtml(req.body.bodyHtml);
+      if (!hasContent(cleaned))
+        return res.status(400).json({ error: "Body can't be empty" });
+      data.bodyHtml = cleaned;
+    }
+    if (typeof req.body?.pinned === "boolean") {
+      data.pinned = req.body.pinned;
+    }
+
+    const announcement = await prisma.announcement.update({
+      where: { id: before.id },
+      data,
     });
-    res.json(announcements);
-  } catch (e) { next(e); }
+    const hydrated = await attachAuthor(announcement);
+
+    await logAudit({
+      workspaceId: before.workspaceId,
+      actorId: req.userId,
+      action: "announcement.update",
+      entity: { type: "Announcement", id: announcement.id },
+      before: { title: before.title, pinned: before.pinned },
+      after: { title: announcement.title, pinned: announcement.pinned },
+    });
+
+    const io = req.app.get("io");
+    io.to(`ws:${before.workspaceId}`).emit("announcement:updated", hydrated);
+
+    res.json(hydrated);
+  } catch (e) {
+    next(e);
+  }
 });
 
 r.patch("/announcements/:id/pin", requireAuth, async (req, res, next) => {
   try {
+    const before = await loadForAdmin(req, res);
+    if (!before) return;
+
+    const pinned = req.body?.pinned === true;
     const announcement = await prisma.announcement.update({
-      where: { id: req.params.id },
-      data: { pinned: req.body.pinned },
+      where: { id: before.id },
+      data: { pinned },
     });
-    res.json(announcement);
-  } catch (e) { next(e); }
+    const hydrated = await attachAuthor(announcement);
+
+    await logAudit({
+      workspaceId: before.workspaceId,
+      actorId: req.userId,
+      action: pinned ? "announcement.pin" : "announcement.unpin",
+      entity: { type: "Announcement", id: announcement.id },
+      before: { pinned: before.pinned },
+      after: { pinned: announcement.pinned },
+    });
+
+    const io = req.app.get("io");
+    io.to(`ws:${before.workspaceId}`).emit("announcement:updated", hydrated);
+
+    res.json(hydrated);
+  } catch (e) {
+    next(e);
+  }
 });
+
+r.delete("/announcements/:id", requireAuth, async (req, res, next) => {
+  try {
+    const before = await loadForAdmin(req, res);
+    if (!before) return;
+
+    await prisma.announcement.delete({ where: { id: before.id } });
+
+    await logAudit({
+      workspaceId: before.workspaceId,
+      actorId: req.userId,
+      action: "announcement.delete",
+      entity: { type: "Announcement", id: before.id },
+      before: { title: before.title, pinned: before.pinned },
+    });
+
+    const io = req.app.get("io");
+    io.to(`ws:${before.workspaceId}`).emit("announcement:deleted", {
+      id: before.id,
+      workspaceId: before.workspaceId,
+    });
+
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/* ─────────────────────────────────────────────
+   REACTIONS — any member
+   ───────────────────────────────────────────── */
 
 r.post("/announcements/:id/reactions", requireAuth, async (req, res, next) => {
   try {
-    const { emoji } = req.body;
+    const announcement = await loadForMember(req, res);
+    if (!announcement) return;
+
+    const emoji = String(req.body?.emoji || "").trim();
+    if (!emoji) return res.status(400).json({ error: "Emoji is required" });
+
     const existing = await prisma.reaction.findUnique({
-      where: { announcementId_userId_emoji: { announcementId: req.params.id, userId: req.userId, emoji } },
+      where: {
+        announcementId_userId_emoji: {
+          announcementId: req.params.id,
+          userId: req.userId,
+          emoji,
+        },
+      },
     });
     if (existing) {
       await prisma.reaction.delete({ where: { id: existing.id } });
-      return res.json({ toggled: false });
+      const updated = await loadAnnouncementForFeed(req.params.id);
+      const io = req.app.get("io");
+      io.to(`ws:${announcement.workspaceId}`).emit("announcement:updated", updated);
+      return res.json(updated);
     }
-    const reaction = await prisma.reaction.create({
+    await prisma.reaction.create({
       data: { announcementId: req.params.id, userId: req.userId, emoji },
     });
-    res.status(201).json({ toggled: true, reaction });
-  } catch (e) { next(e); }
+    const updated = await loadAnnouncementForFeed(req.params.id);
+    const io = req.app.get("io");
+    io.to(`ws:${announcement.workspaceId}`).emit("announcement:updated", updated);
+    res.status(201).json(updated);
+  } catch (e) {
+    next(e);
+  }
 });
+
+/* ─────────────────────────────────────────────
+   COMMENTS — any member
+   ───────────────────────────────────────────── */
 
 r.post("/announcements/:id/comments", requireAuth, async (req, res, next) => {
   try {
-    const { body, mentions = [] } = req.body;
+    const announcement = await loadForMember(req, res);
+    if (!announcement) return;
+
+    const { body, mentions = [] } = req.body || {};
+    const trimmed = typeof body === "string" ? body.trim() : "";
+    if (!trimmed) return res.status(400).json({ error: "Comment can't be empty" });
+
     const comment = await prisma.comment.create({
-      data: { announcementId: req.params.id, authorId: req.userId, body, mentions },
-      include: { author: { select: { id: true, name: true, avatarUrl: true } } },
+      data: {
+        announcementId: req.params.id,
+        authorId: req.userId,
+        body: trimmed,
+        mentions: Array.isArray(mentions) ? mentions : [],
+      },
+      include: { author: { select: AUTHOR_FIELDS } },
     });
+
     const io = req.app.get("io");
-    for (const userId of mentions) {
+    for (const userId of comment.mentions) {
       await prisma.notification.create({
-        data: { userId, type: "mention", payload: { commentId: comment.id, announcementId: req.params.id } },
+        data: {
+          userId,
+          type: "mention",
+          payload: { commentId: comment.id, announcementId: req.params.id },
+        },
       });
       io.to(`user:${userId}`).emit("notification:new", { type: "mention" });
     }
-    res.status(201).json(comment);
-  } catch (e) { next(e); }
+
+    const updated = await loadAnnouncementForFeed(req.params.id);
+    io.to(`ws:${announcement.workspaceId}`).emit("announcement:updated", updated);
+    res.status(201).json(updated);
+  } catch (e) {
+    next(e);
+  }
 });
 
 export default r;
