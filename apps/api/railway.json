@@ -2,7 +2,7 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "RAILPACK",
-    "buildCommand": "pnpm prisma generate",
+    "buildCommand": "pnpm --filter api build",
     "watchPatterns": [
       "apps/api/**",
       "packages/**",
@@ -12,7 +12,7 @@
     ]
   },
   "deploy": {
-    "startCommand": "pnpm prisma migrate deploy && node src/server.js",
+    "startCommand": "pnpm --filter api exec prisma migrate deploy && pnpm --filter api start",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
