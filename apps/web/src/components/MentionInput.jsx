@@ -3,18 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import Avatar from "@/components/ui/Avatar";
 
-const MENTION_MARKER = "\u2063";
-
-/**
- * Plain-text input with `@`-mention autocomplete.
- *
- * We encode selected mentions with invisible ID markers in the textarea
- * value (`@Name⁣<id>⁣`) so mention identity is stable even if multiple
- * members share the same display name.
- */
 export default function MentionInput({
   value,
   onChange,
+  onValueChange,
   onMentionsChange,
   onSubmit,
   members = [],
@@ -28,6 +20,7 @@ export default function MentionInput({
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const [anchor, setAnchor] = useState(null); // index of the `@` char being completed
+  const [mentionRanges, setMentionRanges] = useState([]);
 
   /* Match the partial token immediately after `@` at the caret. The `@`
      must follow a word boundary so emails like name@host don't trigger. */
@@ -49,8 +42,12 @@ export default function MentionInput({
 
   function handleChange(e) {
     const next = e.target.value;
+    const nextRanges = remapMentionRanges(value, next, mentionRanges);
+    const mentionIds = dedupeMentionIds(nextRanges);
+    setMentionRanges(nextRanges);
+    onValueChange?.({ text: next, mentions: mentionIds });
     onChange(next);
-    onMentionsChange?.(resolveMentions(next));
+    onMentionsChange?.(mentionIds);
     refreshMentionState(next, e.target.selectionStart);
   }
 
@@ -89,10 +86,18 @@ export default function MentionInput({
     const caret = ta?.selectionEnd ?? value.length;
     const before = value.slice(0, anchor);
     const after = value.slice(caret);
-    const inserted = `@${user.name}${mentionMarker(user.id)} `;
+    const insertedLabel = `@${user.name}`;
+    const inserted = `${insertedLabel} `;
     const next = before + inserted + after;
+    const remapped = remapMentionRanges(value, next, mentionRanges);
+    const start = before.length;
+    const end = start + insertedLabel.length;
+    const nextRanges = [...remapped, { start, end, userId: String(user.id), label: insertedLabel }];
+    const mentionIds = dedupeMentionIds(nextRanges);
+    setMentionRanges(nextRanges);
+    onValueChange?.({ text: next, mentions: mentionIds });
     onChange(next);
-    onMentionsChange?.(resolveMentions(next));
+    onMentionsChange?.(mentionIds);
     setOpen(false);
     setAnchor(null);
     requestAnimationFrame(() => {
@@ -114,6 +119,10 @@ export default function MentionInput({
   useEffect(() => {
     if (activeIdx >= filtered.length) setActiveIdx(0);
   }, [filtered.length, activeIdx]);
+
+  useEffect(() => {
+    setMentionRanges([]);
+  }, [members]);
 
   return (
     <div className={clsx("relative", className)}>
@@ -171,26 +180,59 @@ export default function MentionInput({
   );
 }
 
-/**
- * Resolve mention IDs from invisible mention markers in text.
- */
-export function resolveMentions(text) {
-  if (!text) return [];
+function dedupeMentionIds(ranges) {
+  if (!ranges?.length) return [];
   const ids = new Set();
-  const re = new RegExp(`${MENTION_MARKER}([^${MENTION_MARKER}\\s]+)${MENTION_MARKER}`, "g");
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    if (m[1]) ids.add(m[1]);
+  for (const r of ranges) {
+    if (r?.userId) ids.add(r.userId);
   }
   return [...ids];
 }
 
-export function stripMentionMarkers(text = "") {
-  if (!text) return "";
-  const re = new RegExp(`${MENTION_MARKER}([^${MENTION_MARKER}\\s]+)${MENTION_MARKER}`, "g");
-  return text.replace(re, "");
+function remapMentionRanges(prevText, nextText, prevRanges) {
+  if (!prevRanges?.length) return [];
+  const prevLen = prevText.length;
+  const nextLen = nextText.length;
+  const prefix = commonPrefixLen(prevText, nextText);
+  const suffix = commonSuffixLen(prevText, nextText, prefix);
+  const prevEditedEnd = prevLen - suffix;
+  const delta = nextLen - prevLen;
+  const nextRanges = [];
+
+  for (const r of prevRanges) {
+    if (!r) continue;
+
+    let start = r.start;
+    let end = r.end;
+
+    if (end <= prefix) {
+      // unchanged
+    } else if (start >= prevEditedEnd) {
+      start += delta;
+      end += delta;
+    } else {
+      // Edited across this mention: drop to avoid stale ID association.
+      continue;
+    }
+
+    if (start < 0 || end > nextText.length || start >= end) continue;
+    if (nextText.slice(start, end) !== r.label) continue;
+    nextRanges.push({ ...r, start, end });
+  }
+
+  return nextRanges;
 }
 
-function mentionMarker(userId) {
-  return `${MENTION_MARKER}${String(userId)}${MENTION_MARKER}`;
+function commonPrefixLen(a, b) {
+  const max = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < max && a[i] === b[i]) i += 1;
+  return i;
+}
+
+function commonSuffixLen(a, b, prefixLen) {
+  const max = Math.min(a.length - prefixLen, b.length - prefixLen);
+  let i = 0;
+  while (i < max && a[a.length - 1 - i] === b[b.length - 1 - i]) i += 1;
+  return i;
 }

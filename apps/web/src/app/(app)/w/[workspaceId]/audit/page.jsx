@@ -62,6 +62,7 @@ export default function AuditPage() {
   const startIdx = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endIdx = Math.min(page * PAGE_SIZE, total);
   const accent = ws?.accentColor || "#D34F1F";
+  const isAdmin = ws?.viewerRole === "ADMIN";
   const csvHref = `${process.env.NEXT_PUBLIC_API_URL}/api/workspaces/${workspaceId}/audit.csv`;
 
   const filteredRows = useMemo(() => rows, [rows]);
@@ -85,13 +86,31 @@ export default function AuditPage() {
               Immutable timeline of workspace activity, filterable by actor, action, and date range.
             </p>
           </div>
-          <a
-            href={csvHref}
-            className="inline-flex items-center gap-2.5 bg-ink text-paper px-4 py-2.5 hover:bg-ink-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-          >
-            <Download size={14} strokeWidth={1.75} aria-hidden="true" />
-            <span className="font-mono text-[10px] uppercase tracking-widest2">Download CSV</span>
-          </a>
+          {isAdmin ? (
+            <a
+              href={csvHref}
+              className="inline-flex items-center gap-2.5 bg-ink text-paper px-4 py-2.5 hover:bg-ink-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+            >
+              <Download size={14} strokeWidth={1.75} aria-hidden="true" />
+              <span className="font-mono text-[10px] uppercase tracking-widest2">Download CSV</span>
+            </a>
+          ) : (
+            <div className="flex flex-col items-start gap-1">
+              <button
+                type="button"
+                disabled
+                aria-disabled="true"
+                title="Only admins can download the audit CSV."
+                className="inline-flex items-center gap-2.5 bg-ink/30 text-paper px-4 py-2.5 cursor-not-allowed"
+              >
+                <Download size={14} strokeWidth={1.75} aria-hidden="true" />
+                <span className="font-mono text-[10px] uppercase tracking-widest2">Download CSV</span>
+              </button>
+              <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45">
+                Admins only
+              </p>
+            </div>
+          )}
         </div>
       </header>
 

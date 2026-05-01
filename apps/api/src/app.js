@@ -12,10 +12,20 @@ import { errorHandler } from "./middleware/error.js";
 const app = express();
 app.use(helmet());
 
+const normalizeOrigin = (value) => {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed.replace(/\/+$/, "");
+  }
+};
+
 const allowedOrigins = new Set(
   String(env.CLIENT_URL || "http://localhost:3000")
     .split(",")
-    .map((v) => v.trim())
+    .map((v) => normalizeOrigin(v))
     .filter(Boolean)
 );
 
@@ -25,7 +35,8 @@ app.use(
     origin: (origin, callback) => {
       // Allow same-origin/non-browser requests (no Origin header).
       if (!origin) return callback(null, true);
-      if (allowedOrigins.has(origin)) return callback(null, true);
+      const normalizedOrigin = normalizeOrigin(origin);
+      if (allowedOrigins.has(normalizedOrigin)) return callback(null, true);
       const err = new Error("CORS origin not allowed");
       err.status = 403;
       return callback(err);
