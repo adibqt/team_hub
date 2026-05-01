@@ -6,7 +6,10 @@ import { Mail, Lock, User, ArrowRight, AlertOctagon } from "lucide-react";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import FormField from "@/components/auth/FormField";
-import PasswordStrength, { getStrength } from "@/components/auth/PasswordStrength";
+import PasswordStrength, {
+  firstFailedRule,
+  isPasswordValid,
+} from "@/components/auth/PasswordStrength";
 
 function safeNext(raw) {
   if (!raw || typeof raw !== "string") return null;
@@ -49,7 +52,11 @@ export default function RegisterPage() {
   const now = useNowHHMM();
   const [edition, setEdition] = useState("Morning edition");
 
-  const tooWeak = form.password.length > 0 && getStrength(form.password) < 1;
+  const trimmedName = form.name.trim();
+  const trimmedEmail = form.email.trim();
+  const passwordOk = isPasswordValid(form.password);
+  const formInvalid =
+    !trimmedName || !trimmedEmail || !passwordOk;
 
   useEffect(() => {
     const tickEdition = () => setEdition(getEditionLabel());
@@ -61,13 +68,32 @@ export default function RegisterPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
-    if (form.password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (!trimmedName) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!trimmedEmail) {
+      setError("Please enter your work email.");
+      return;
+    }
+    const failed = firstFailedRule(form.password);
+    if (failed) {
+      const reason =
+        failed.id === "len"
+          ? "Password must be at least 8 characters."
+          : failed.id === "case"
+          ? "Password must include both upper and lower case letters."
+          : "Password must include at least one number.";
+      setError(reason);
       return;
     }
     setLoading(true);
     try {
-      const { data } = await api.post("/api/auth/register", form);
+      const { data } = await api.post("/api/auth/register", {
+        ...form,
+        name: trimmedName,
+        email: trimmedEmail,
+      });
       setUser(data);
       router.replace(next || "/dashboard");
     } catch (err) {
@@ -204,7 +230,7 @@ export default function RegisterPage() {
         <div className="animate-stagger-up" style={{ animationDelay: "0.65s" }}>
           <button
             type="submit"
-            disabled={loading || tooWeak}
+            disabled={loading || formInvalid}
             className="heat-btn group/btn relative w-full inline-flex items-center justify-between gap-3 bg-ink text-paper px-5 py-4 text-sm font-medium tracking-wide
                      transition-all duration-200
                      hover:bg-ember

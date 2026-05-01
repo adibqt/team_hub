@@ -68,12 +68,12 @@ describe("POST /api/auth/register", () => {
 
     const res = await request(app)
       .post("/api/auth/register")
-      .send({ email: "a@b.com", password: "secret123", name: "Alice" });
+      .send({ email: "a@b.com", password: "Secret123", name: "Alice" });
 
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ id: "u1", email: "a@b.com", name: "Alice" });
 
-    expect(bcrypt.hash).toHaveBeenCalledWith("secret123", 10);
+    expect(bcrypt.hash).toHaveBeenCalledWith("Secret123", 10);
     expect(prisma.user.create).toHaveBeenCalledWith({
       data: { email: "a@b.com", password: "hashed-pw", name: "Alice" },
     });
@@ -101,7 +101,7 @@ describe("POST /api/auth/register", () => {
 
     const res = await request(app)
       .post("/api/auth/register")
-      .send({ email: "a@b.com", password: "secret123", name: "Alice" });
+      .send({ email: "a@b.com", password: "Secret123", name: "Alice" });
 
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ error: "Email already in use" });
@@ -116,7 +116,7 @@ describe("POST /api/auth/register", () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => {});
     const res = await request(app)
       .post("/api/auth/register")
-      .send({ email: "a@b.com", password: "secret123", name: "Alice" });
+      .send({ email: "a@b.com", password: "Secret123", name: "Alice" });
     spy.mockRestore();
 
     expect(res.status).toBe(500);

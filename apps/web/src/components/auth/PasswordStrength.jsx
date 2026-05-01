@@ -1,15 +1,28 @@
 "use client";
 import clsx from "clsx";
 
-const RULES = [
+export const PASSWORD_RULES = [
   { id: "len",  label: "8+ characters",     test: (p) => p.length >= 8 },
   { id: "case", label: "Aa mixed case",     test: (p) => /[a-z]/.test(p) && /[A-Z]/.test(p) },
   { id: "num",  label: "0-9 number",        test: (p) => /\d/.test(p) },
 ];
 
+const RULES = PASSWORD_RULES;
+
 export function getStrength(password) {
   if (!password) return 0;
   return RULES.reduce((n, r) => n + (r.test(password) ? 1 : 0), 0);
+}
+
+export const MAX_STRENGTH = RULES.length;
+
+export function isPasswordValid(password) {
+  return getStrength(password) === MAX_STRENGTH;
+}
+
+export function firstFailedRule(password) {
+  if (!password) return RULES[0];
+  return RULES.find((r) => !r.test(password)) || null;
 }
 
 const LEVEL = [

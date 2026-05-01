@@ -37,8 +37,11 @@ const passwordSchema = z
   .string()
   .min(8, "Password must be at least 8 characters")
   .max(200, "Password is too long")
-  .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), {
-    message: "Password must contain a letter and a number",
+  .refine((v) => /[a-z]/.test(v) && /[A-Z]/.test(v), {
+    message: "Password must include both upper and lower case letters",
+  })
+  .refine((v) => /\d/.test(v), {
+    message: "Password must include at least one number",
   });
 
 const registerSchema = z.object({
