@@ -2,12 +2,100 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Theme tokens ───────────────────────────────────────────────
+   RGB triplets — consumed by Tailwind via `rgb(var(--token) / <alpha>)`
+   so utility classes like `text-ink/65` stay alpha-aware in both themes. */
 :root {
-  --paper: #F5F1E8;
-  --paper-2: #EAE4D5;
-  --ink: #0F0F12;
-  --ink-soft: #3A3937;
-  --ember: #D34F1F;
+  --color-paper:     245 241 232;
+  --color-paper-50:  251 249 244;
+  --color-paper-100: 245 241 232;
+  --color-paper-200: 234 228 213;
+  --color-paper-300: 221 212 190;
+  --color-paper-400: 200 188 159;
+
+  --color-ink:       15 15 18;
+  --color-ink-50:    107 106 104;
+  --color-ink-100:   90 89 87;
+  --color-ink-200:   58 57 55;
+  --color-ink-300:   31 30 32;
+  --color-ink-900:   15 15 18;
+
+  --color-ember:     211 79 31;
+  --color-ember-50:  251 233 223;
+  --color-ember-100: 246 205 184;
+  --color-ember-200: 239 171 138;
+  --color-ember-300: 231 138 95;
+  --color-ember-400: 221 110 61;
+  --color-ember-500: 211 79 31;
+  --color-ember-600: 178 62 20;
+  --color-ember-700: 140 47 14;
+  --color-ember-800: 95 31 8;
+
+  --color-sage:      90 107 82;
+  --color-sage-100:  215 221 210;
+  --color-sage-400:  122 140 113;
+  --color-sage-500:  90 107 82;
+  --color-sage-600:  70 84 65;
+
+  /* Editorial-paper legacy aliases (unused-by-Tailwind, kept for any
+     component still referencing the original variable names). */
+  --paper:    rgb(var(--color-paper));
+  --paper-2:  rgb(var(--color-paper-200));
+  --ink:      rgb(var(--color-ink));
+  --ink-soft: rgb(var(--color-ink-200));
+  --ember:    rgb(var(--color-ember));
+
+  --grain-opacity: 0.06;
+  --grain-blend: multiply;
+  color-scheme: light;
+}
+
+.dark {
+  /* Background scale — paper drops to deep ink; "lighter" steps reveal
+     surface elevation against the body background. */
+  --color-paper:     18 18 22;
+  --color-paper-50:  26 26 30;
+  --color-paper-100: 22 22 26;
+  --color-paper-200: 30 30 36;
+  --color-paper-300: 44 44 52;
+  --color-paper-400: 70 70 82;
+
+  /* Foreground scale — ink becomes warm cream; the /xx alpha utilities
+     produce muted text without us having to touch the call sites. */
+  --color-ink:       236 230 218;
+  --color-ink-50:    150 145 135;
+  --color-ink-100:   175 170 160;
+  --color-ink-200:   200 195 185;
+  --color-ink-300:   220 215 205;
+  --color-ink-900:   245 241 232;
+
+  /* Ember nudged a touch brighter to keep AA contrast on the darker paper. */
+  --color-ember:     232 110 60;
+  --color-ember-50:  60 24 12;
+  --color-ember-100: 90 35 18;
+  --color-ember-200: 130 52 24;
+  --color-ember-300: 170 70 32;
+  --color-ember-400: 200 88 44;
+  --color-ember-500: 232 110 60;
+  --color-ember-600: 240 138 92;
+  --color-ember-700: 246 170 130;
+  --color-ember-800: 250 198 168;
+
+  --color-sage:      138 158 128;
+  --color-sage-100:  60 72 54;
+  --color-sage-400:  108 126 100;
+  --color-sage-500:  138 158 128;
+  --color-sage-600:  170 188 162;
+
+  --paper:    rgb(var(--color-paper));
+  --paper-2:  rgb(var(--color-paper-200));
+  --ink:      rgb(var(--color-ink));
+  --ink-soft: rgb(var(--color-ink-200));
+  --ember:    rgb(var(--color-ember));
+
+  --grain-opacity: 0.10;
+  --grain-blend: overlay;
+  color-scheme: dark;
 }
 
 html,
@@ -18,15 +106,15 @@ body {
 body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-feature-settings: "ss01", "cv11";
-  background-color: var(--paper);
-  color: var(--ink);
+  background-color: rgb(var(--color-paper));
+  color: rgb(var(--color-ink));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 ::selection {
-  background: var(--ink);
-  color: var(--paper);
+  background: rgb(var(--color-ink));
+  color: rgb(var(--color-paper));
 }
 
 /* Editorial display — Fraunces with optical sizing tuned for headlines */
@@ -53,8 +141,8 @@ body {
   pointer-events: none;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.5 0'/></filter><rect width='240' height='240' filter='url(%23n)'/></svg>");
   background-size: 240px 240px;
-  opacity: 0.06;
-  mix-blend-mode: multiply;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
 }
 
 /* ─── Announcement / rich-text prose ─────────────────────────────
@@ -65,7 +153,7 @@ body {
 .announcement-prose {
   font-size: 15px;
   line-height: 1.65;
-  color: var(--ink);
+  color: rgb(var(--color-ink));
 }
 .rte-prose > * + *,
 .announcement-prose > * + * {
@@ -92,7 +180,7 @@ body {
 .rte-prose strong,
 .announcement-prose strong {
   font-weight: 600;
-  color: var(--ink);
+  color: rgb(var(--color-ink));
 }
 .rte-prose em,
 .announcement-prose em {
@@ -118,28 +206,28 @@ body {
 }
 .rte-prose blockquote,
 .announcement-prose blockquote {
-  border-left: 2px solid var(--ember);
+  border-left: 2px solid rgb(var(--color-ember));
   padding: 0.1em 0 0.1em 1em;
-  color: rgba(15, 15, 18, 0.75);
+  color: rgb(var(--color-ink) / 0.75);
   font-style: italic;
 }
 .rte-prose code,
 .announcement-prose code {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
   font-size: 0.9em;
-  background: rgba(15, 15, 18, 0.06);
+  background: rgb(var(--color-ink) / 0.06);
   padding: 0.08em 0.4em;
   border-radius: 2px;
 }
 .rte-prose hr,
 .announcement-prose hr {
   border: 0;
-  border-top: 1px solid rgba(15, 15, 18, 0.18);
+  border-top: 1px solid rgb(var(--color-ink) / 0.18);
   margin: 1.4em 0;
 }
 .rte-prose a,
 .announcement-prose a {
-  color: var(--ember);
+  color: rgb(var(--color-ember));
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;

@@ -1,6 +1,8 @@
 import { Fraunces, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
+import ThemeScript from "@/components/ThemeScript";
+import ThemeProvider from "@/components/ThemeProvider";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -31,22 +33,31 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${fraunces.variable} ${interTight.variable} ${jetbrainsMono.variable}`}
     >
+      <head>
+        <ThemeScript />
+      </head>
       <body className="font-sans antialiased bg-paper text-ink">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
         <Toaster
           position="top-right"
           toastOptions={{
             style: {
               borderRadius: "2px",
-              background: "#0F0F12",
-              color: "#F5F1E8",
+              background: "rgb(var(--color-ink))",
+              color: "rgb(var(--color-paper))",
               fontFamily: "var(--font-mono)",
               fontSize: "13px",
               letterSpacing: "0.01em",
             },
-            success: { iconTheme: { primary: "#D34F1F", secondary: "#0F0F12" } },
+            success: {
+              iconTheme: {
+                primary: "rgb(var(--color-ember))",
+                secondary: "rgb(var(--color-ink))",
+              },
+            },
           }}
         />
       </body>

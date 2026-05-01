@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ActivityTicker from "@/components/auth/ActivityTicker";
+import { ThemeToggleIcon } from "@/components/ThemeToggle";
 
 const VOLUME = String(new Date().getFullYear()).slice(-2);
 const ISSUE = String(Math.ceil((new Date().getMonth() + 1) / 3)).padStart(2, "0");
@@ -57,6 +58,8 @@ export default function AuthLayout({ children }) {
               </span>
               LIVE
             </span>
+            <span className="inline-block h-3 w-px bg-ink/15" aria-hidden="true" />
+            <ThemeToggleIcon />
           </div>
         </div>
       </header>

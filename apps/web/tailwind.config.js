@@ -1,5 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+const withVar = (name) => `rgb(var(${name}) / <alpha-value>)`;
+
 module.exports = {
+  darkMode: "class",
   content: [
     "./src/app/**/*.{js,jsx}",
     "./src/components/**/*.{js,jsx}",
@@ -12,41 +15,43 @@ module.exports = {
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
-        // Editorial palette — warm paper, deep ink, burnt ember
+        // Editorial palette, driven by CSS variables so the same Tailwind
+        // class (`bg-paper`, `text-ink`, …) flips cleanly between the light
+        // and dark themes. RGB triplets live in globals.css.
         paper: {
-          DEFAULT: "#F5F1E8",   // primary cream background
-          50:  "#FBF9F4",
-          100: "#F5F1E8",
-          200: "#EAE4D5",
-          300: "#DDD4BE",
-          400: "#C8BC9F",
+          DEFAULT: withVar("--color-paper"),
+          50:  withVar("--color-paper-50"),
+          100: withVar("--color-paper-100"),
+          200: withVar("--color-paper-200"),
+          300: withVar("--color-paper-300"),
+          400: withVar("--color-paper-400"),
         },
         ink: {
-          DEFAULT: "#0F0F12",
-          50:  "#6B6A68",
-          100: "#5A5957",
-          200: "#3A3937",
-          300: "#1F1E20",
-          900: "#0F0F12",
+          DEFAULT: withVar("--color-ink"),
+          50:  withVar("--color-ink-50"),
+          100: withVar("--color-ink-100"),
+          200: withVar("--color-ink-200"),
+          300: withVar("--color-ink-300"),
+          900: withVar("--color-ink-900"),
         },
         ember: {
-          DEFAULT: "#D34F1F",
-          50:  "#FBE9DF",
-          100: "#F6CDB8",
-          200: "#EFAB8A",
-          300: "#E78A5F",
-          400: "#DD6E3D",
-          500: "#D34F1F",
-          600: "#B23E14",
-          700: "#8C2F0E",
-          800: "#5F1F08",
+          DEFAULT: withVar("--color-ember"),
+          50:  withVar("--color-ember-50"),
+          100: withVar("--color-ember-100"),
+          200: withVar("--color-ember-200"),
+          300: withVar("--color-ember-300"),
+          400: withVar("--color-ember-400"),
+          500: withVar("--color-ember-500"),
+          600: withVar("--color-ember-600"),
+          700: withVar("--color-ember-700"),
+          800: withVar("--color-ember-800"),
         },
         sage: {
-          DEFAULT: "#5A6B52",
-          100: "#D7DDD2",
-          400: "#7A8C71",
-          500: "#5A6B52",
-          600: "#465441",
+          DEFAULT: withVar("--color-sage"),
+          100: withVar("--color-sage-100"),
+          400: withVar("--color-sage-400"),
+          500: withVar("--color-sage-500"),
+          600: withVar("--color-sage-600"),
         },
         // Keep `brand` so any non-auth surfaces don't break.
         brand: {

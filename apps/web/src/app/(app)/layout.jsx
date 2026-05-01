@@ -24,6 +24,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useNotificationsStore } from "@/stores/notificationsStore";
 import UserMenu from "@/components/UserMenu";
+import ThemeToggle from "@/components/ThemeToggle";
 import NotificationBell from "@/components/NotificationBell";
 import CreateWorkspaceModal from "@/components/workspaces/CreateWorkspaceModal";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -320,6 +321,12 @@ export default function AppLayout({ children }) {
 
         {/* Footer / user card */}
         <div className="px-3 py-4 border-t border-ink/15">
+          <div className="px-1 pb-3 flex items-center justify-between gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/40">
+              <span className="text-ember">§</span>&nbsp;Theme
+            </span>
+            <ThemeToggle />
+          </div>
           <UserMenu />
           <p className="mt-3 px-2 font-mono text-[10px] uppercase tracking-widest2 text-ink/35 flex items-center justify-between gap-2">
             <span>&copy; {new Date().getFullYear()} TH</span>
