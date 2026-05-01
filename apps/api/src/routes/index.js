@@ -8,11 +8,13 @@ import announcementsRoutes from "./announcements.routes.js";
 import actionItemsRoutes from "./actionItems.routes.js";
 import analyticsRoutes from "./analytics.routes.js";
 import auditRoutes from "./audit.routes.js";
+import notificationsRoutes from "./notifications.routes.js";
 
 const r = Router();
 
 r.use("/auth", authRoutes);
 r.use("/users", usersRoutes);
+r.use("/notifications", notificationsRoutes);
 r.use("/workspaces", workspacesRoutes);
 r.use("/workspaces", analyticsRoutes);
 r.use("/workspaces", auditRoutes);

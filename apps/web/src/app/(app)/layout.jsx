@@ -17,11 +17,16 @@ import {
   Compass,
 } from "lucide-react";
 import clsx from "clsx";
+import toast from "react-hot-toast";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useNotificationsStore } from "@/stores/notificationsStore";
 import UserMenu from "@/components/UserMenu";
+import NotificationBell from "@/components/NotificationBell";
 import CreateWorkspaceModal from "@/components/workspaces/CreateWorkspaceModal";
+import { getSocket } from "@/lib/socket";
+import { useWorkspaceLive } from "@/lib/useWorkspaceLive";
 
 const TOP_NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, n: "01" },
@@ -46,6 +51,8 @@ export default function AppLayout({ children }) {
   const setUser = useAuthStore((s) => s.setUser);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const load = useWorkspaceStore((s) => s.load);
+  const loadNotifications = useNotificationsStore((s) => s.load);
+  const pushNotification = useNotificationsStore((s) => s.pushNotification);
   const [bootChecked, setBootChecked] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -56,14 +63,37 @@ export default function AppLayout({ children }) {
       .then(({ data }) => {
         setUser(data);
         load().catch(() => {});
+        loadNotifications().catch(() => {});
       })
       .catch(() => router.replace("/login"))
       .finally(() => setBootChecked(true));
-  }, [router, setUser, load]);
+  }, [router, setUser, load, loadNotifications]);
+
+  // Global socket subscription for notifications, scoped to the user's
+  // personal room (the API joins us into it on connect). One handler for
+  // the whole app — workspace pages bind their own listeners separately.
+  useEffect(() => {
+    if (!user?.id) return;
+    const s = getSocket();
+    const onNew = (note) => {
+      pushNotification(note);
+      if (note?.type === "mention" && note?.payload?.actorName) {
+        toast(`${note.payload.actorName} mentioned you`, { icon: "@" });
+      }
+    };
+    s.on("notification:new", onNew);
+    return () => {
+      s.off("notification:new", onNew);
+    };
+  }, [user?.id, pushNotification]);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  // Hooks must run unconditionally — keep this above the auth-loading
+  // early return so React's hook order stays stable across renders.
+  useWorkspaceLive(params?.workspaceId);
 
   if (!bootChecked || !user) {
     return (
@@ -105,14 +135,17 @@ export default function AppLayout({ children }) {
             Workbench
           </span>
         </Link>
-        <button
-          type="button"
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMobileOpen((v) => !v)}
-          className="p-2 border border-ink/15 hover:border-ink/45 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
-        >
-          {mobileOpen ? <X size={18} strokeWidth={1.75} /> : <Menu size={18} strokeWidth={1.75} />}
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <button
+            type="button"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMobileOpen((v) => !v)}
+            className="p-2 border border-ink/15 hover:border-ink/45 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
+          >
+            {mobileOpen ? <X size={18} strokeWidth={1.75} /> : <Menu size={18} strokeWidth={1.75} />}
+          </button>
+        </div>
       </header>
 
       {/* ============================================================ SIDEBAR */}
@@ -139,9 +172,12 @@ export default function AppLayout({ children }) {
                 The Team Hub
               </span>
             </Link>
-            <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/35 tabular-nums">
-              v.{String(new Date().getFullYear()).slice(-2)}
-            </span>
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/35 tabular-nums">
+                v.{String(new Date().getFullYear()).slice(-2)}
+              </span>
+            </div>
           </div>
           <p className="mt-1.5 font-mono text-[10px] uppercase tracking-widest2 text-ink/45 flex items-center gap-2">
             <span className="relative inline-flex h-1.5 w-1.5">

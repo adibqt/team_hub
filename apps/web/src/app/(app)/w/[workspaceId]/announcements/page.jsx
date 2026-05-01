@@ -14,6 +14,9 @@ import {
 import toast from "react-hot-toast";
 import Avatar from "@/components/ui/Avatar";
 import AnnouncementModal from "@/components/announcements/AnnouncementModal";
+import MentionInput, { resolveMentions } from "@/components/MentionInput";
+import OnlineMembers from "@/components/OnlineMembers";
+import { useWorkspaceLive } from "@/lib/useWorkspaceLive";
 import { useAnnouncementsStore } from "@/stores/announcementsStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -69,6 +72,7 @@ export default function AnnouncementsPage() {
   const [editing, setEditing] = useState(null);
 
   const isAdmin = ws?.viewerRole === "ADMIN";
+  useWorkspaceLive(workspaceId);
 
   /* ─── Initial load + socket subscription ─────────────────────── */
   useEffect(() => {
@@ -160,9 +164,9 @@ export default function AnnouncementsPage() {
     }
   }
 
-  async function handleComment(announcementId, body) {
+  async function handleComment(announcementId, body, mentions = []) {
     try {
-      await addComment(announcementId, body);
+      await addComment(announcementId, body, mentions);
     } catch (err) {
       toast.error(err?.response?.data?.error || "Couldn't add comment.");
       throw err;
@@ -191,7 +195,8 @@ export default function AnnouncementsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <OnlineMembers workspaceId={workspaceId} />
             <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45 tabular-nums">
               {loading
                 ? "loading…"
@@ -250,8 +255,9 @@ export default function AnnouncementsPage() {
                       onEdit={() => openEditor(a)}
                       onDelete={() => handleDelete(a)}
                       onReact={(emoji) => handleReact(a.id, emoji)}
-                      onComment={(body) => handleComment(a.id, body)}
+                      onComment={(body, mentions) => handleComment(a.id, body, mentions)}
                       currentUserId={me?.id}
+                      members={ws?.members || []}
                     />
                   ))}
                 </ul>
@@ -331,7 +337,12 @@ function AnnouncementCard({
   onReact,
   onComment,
   currentUserId,
+  members = [],
 }) {
+  const memberNames = useMemo(
+    () => (members || []).map((m) => m.user.name).sort((x, y) => y.length - x.length),
+    [members]
+  );
   const [commentBody, setCommentBody] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const reactionCounts = useMemo(() => {
@@ -350,12 +361,13 @@ function AnnouncementCard({
   );
 
   async function submitComment(e) {
-    e.preventDefault();
+    e?.preventDefault?.();
     const trimmed = commentBody.trim();
     if (!trimmed || submittingComment) return;
     setSubmittingComment(true);
     try {
-      await onComment(trimmed);
+      const mentions = resolveMentions(trimmed, members);
+      await onComment(trimmed, mentions);
       setCommentBody("");
     } finally {
       setSubmittingComment(false);
@@ -468,20 +480,24 @@ function AnnouncementCard({
                       <span className="mx-1.5 text-ink/25">•</span>
                       {fmtRelative(c.createdAt)}
                     </p>
-                    <p className="mt-1 text-[14px] text-ink/85 whitespace-pre-wrap">{c.body}</p>
+                    <p className="mt-1 text-[14px] text-ink/85 whitespace-pre-wrap">
+                      <CommentBody body={c.body} memberNames={memberNames} />
+                    </p>
                   </li>
                 ))}
               </ul>
             )}
 
-            <form onSubmit={submitComment} className="mt-3 flex gap-2">
-              <input
-                type="text"
+            <form onSubmit={submitComment} className="mt-3 flex gap-2 items-start">
+              <MentionInput
+                className="flex-1"
                 value={commentBody}
-                onChange={(e) => setCommentBody(e.target.value)}
-                placeholder="Write a comment..."
-                className="flex-1 border border-ink/20 bg-paper px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ember/40"
-                maxLength={500}
+                onChange={setCommentBody}
+                onSubmit={submitComment}
+                members={members}
+                disabled={submittingComment}
+                placeholder="Write a comment… type @ to mention"
+                maxLength={1000}
               />
               <button
                 type="submit"
@@ -496,6 +512,37 @@ function AnnouncementCard({
       </article>
     </li>
   );
+}
+
+/**
+ * Render a comment body, highlighting any `@<member name>` token. We
+ * scan against the live roster (longest names first to avoid partial
+ * matches eating prefixes — e.g. "@Adib R" before "@Adib"). Anything
+ * else falls through as plain text.
+ */
+function CommentBody({ body, memberNames }) {
+  if (!body) return null;
+  if (!memberNames?.length) return <>{body}</>;
+  const escaped = memberNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const re = new RegExp(`(^|\\s)@(${escaped.join("|")})\\b`, "g");
+  const parts = [];
+  let last = 0;
+  let m;
+  while ((m = re.exec(body)) !== null) {
+    const start = m.index + m[1].length;
+    if (start > last) parts.push(body.slice(last, start));
+    parts.push(
+      <span
+        key={`m-${start}`}
+        className="text-ember bg-ember/10 px-1 -mx-0.5 font-medium"
+      >
+        @{m[2]}
+      </span>
+    );
+    last = start + 1 + m[2].length;
+  }
+  if (last < body.length) parts.push(body.slice(last));
+  return <>{parts}</>;
 }
 
 /* Small helper for the inline icon buttons in the meta row. */

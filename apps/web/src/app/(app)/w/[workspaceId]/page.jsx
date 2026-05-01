@@ -6,7 +6,7 @@ import { ArrowRight, Target, ListChecks, Megaphone, Users, ScrollText, Settings,
 import { useGoalsStore } from "@/stores/goalsStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { getSocket } from "@/lib/socket";
-import { usePresenceStore } from "@/stores/presenceStore";
+import OnlineMembers from "@/components/OnlineMembers";
 
 const TODAY = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
@@ -20,7 +20,6 @@ export default function WorkspaceHomePage() {
   const { goals, load: loadGoals } = useGoalsStore();
   const ws = useWorkspaceStore((s) => s.workspaceById[workspaceId]);
   const loadOne = useWorkspaceStore((s) => s.loadOne);
-  const setOnline = usePresenceStore((s) => s.setOnline);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,17 +30,13 @@ export default function WorkspaceHomePage() {
       .finally(() => mounted && setLoading(false));
 
     const s = getSocket();
-    s.emit("workspace:join", workspaceId);
     const onCreated = (g) => useGoalsStore.getState().pushGoal(g);
-    const onPresence = (ids) => setOnline(ids);
     s.on("goal:created", onCreated);
-    s.on("presence:update", onPresence);
     return () => {
       mounted = false;
       s.off("goal:created", onCreated);
-      s.off("presence:update", onPresence);
     };
-  }, [workspaceId, loadOne, loadGoals, setOnline]);
+  }, [workspaceId, loadOne, loadGoals]);
 
   const accent = ws?.accentColor || "#D34F1F";
   const isAdmin = ws?.viewerRole === "ADMIN";
@@ -82,11 +77,13 @@ export default function WorkspaceHomePage() {
 
           <div className="lg:max-w-md">
             <div className="hairline text-ink/20 mb-3" aria-hidden="true" />
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span aria-hidden="true" className="h-3 w-3 ring-1 ring-ink/15" style={{ background: accent }} />
               <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55 tabular-nums">
                 Accent · {accent.toUpperCase()}
               </p>
+              <span aria-hidden="true" className="h-3 w-px bg-ink/15" />
+              <OnlineMembers workspaceId={workspaceId} />
             </div>
           </div>
         </div>

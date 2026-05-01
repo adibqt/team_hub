@@ -400,15 +400,27 @@ r.post("/announcements/:id/comments", requireAuth, async (req, res, next) => {
     });
 
     const io = req.app.get("io");
-    for (const userId of comment.mentions) {
-      await prisma.notification.create({
+    // De-dupe mentions and never notify the author about their own comment.
+    const targets = [...new Set(comment.mentions || [])].filter(
+      (id) => id && id !== req.userId
+    );
+    for (const userId of targets) {
+      const note = await prisma.notification.create({
         data: {
           userId,
           type: "mention",
-          payload: { commentId: comment.id, announcementId: req.params.id },
+          payload: {
+            commentId: comment.id,
+            announcementId: req.params.id,
+            workspaceId: announcement.workspaceId,
+            actorId: req.userId,
+            actorName: comment.author?.name || null,
+            announcementTitle: announcement.title,
+            preview: trimmed.length > 140 ? trimmed.slice(0, 137) + "…" : trimmed,
+          },
         },
       });
-      io.to(`user:${userId}`).emit("notification:new", { type: "mention" });
+      io.to(`user:${userId}`).emit("notification:new", note);
     }
 
     const updated = await loadAnnouncementForFeed(req.params.id);

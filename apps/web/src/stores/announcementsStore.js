@@ -136,10 +136,10 @@ export const useAnnouncementsStore = create((set, get) => ({
     return data;
   },
 
-  addComment: async (announcementId, body) => {
+  addComment: async (announcementId, body, mentions = []) => {
     const { data } = await api.post(`/api/announcements/${announcementId}/comments`, {
       body,
-      mentions: [],
+      mentions,
     });
     set((state) => ({
       announcements: sortAnnouncements(
