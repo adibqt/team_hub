@@ -18,7 +18,7 @@ function fmtRelative(d) {
   return new Date(d).toLocaleDateString();
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ align = "right" }) {
   const items = useNotificationsStore((s) => s.items);
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const markRead = useNotificationsStore((s) => s.markRead);
@@ -69,7 +69,10 @@ export default function NotificationBell() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-[360px] z-50 bg-paper border border-ink/15 shadow-2xl animate-fade-up"
+          className={clsx(
+            "absolute mt-2 w-[360px] z-50 bg-paper border border-ink/15 shadow-2xl animate-fade-up",
+            align === "left" ? "left-0" : "right-0"
+          )}
         >
           <div className="px-4 py-3 border-b border-ink/15 flex items-center justify-between">
             <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55">

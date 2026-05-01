@@ -173,7 +173,7 @@ export default function AppLayout({ children }) {
               </span>
             </Link>
             <div className="flex items-center gap-1">
-              <NotificationBell />
+              <NotificationBell align="left" />
               <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/35 tabular-nums">
                 v.{String(new Date().getFullYear()).slice(-2)}
               </span>

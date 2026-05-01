@@ -283,8 +283,9 @@ export default function AnnouncementsPage() {
                         onEdit={() => openEditor(a)}
                         onDelete={() => handleDelete(a)}
                         onReact={(emoji) => handleReact(a.id, emoji)}
-                        onComment={(body) => handleComment(a.id, body)}
+                        onComment={(body, mentions) => handleComment(a.id, body, mentions)}
                         currentUserId={me?.id}
+                        members={ws?.members || []}
                       />
                     ))}
                   </ul>
