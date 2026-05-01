@@ -4,6 +4,8 @@
     "build": { "dependsOn": ["^build"], "outputs": [".next/**", "dist/**"] },
     "dev":   { "cache": false, "persistent": true },
     "lint":  {},
+    "test":  { "outputs": [], "dependsOn": [] },
+    "test:coverage": { "outputs": ["coverage/**"], "dependsOn": [] },
     "db:generate": { "cache": false }
   }
 }
