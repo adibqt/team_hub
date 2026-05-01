@@ -228,19 +228,21 @@ The web app stays usable when the network drops: GET responses are cached, mutat
 
 ## Deployment (Railway)
 
-Both apps deploy as separate services inside one Railway project, sharing a Postgres plugin.
+Both apps deploy as separate services inside a single Railway project, sharing a PostgreSQL plugin that injects `DATABASE_URL` automatically. Each app ships its own `railway.json` (`apps/api/railway.json`, `apps/web/railway.json`) so build/start commands and the API healthcheck are version-controlled — Railway picks them up when each service's **Root Directory** is set to that subfolder.
 
-**API service** — root directory `apps/api`
-- **Build:** `pnpm install --frozen-lockfile && pnpm prisma generate && pnpm prisma migrate deploy`
-- **Start:** `pnpm start`
-- **Env vars:** all backend vars above; reference Postgres as `${{Postgres.DATABASE_URL}}`; set `CLIENT_URL` to the web service URL.
+**Quick reference**
 
-**Web service** — root directory `apps/web`
-- **Build:** `pnpm install --frozen-lockfile && pnpm build`
-- **Start:** `pnpm start`
-- **Env vars:** `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` set to the API service URL.
+| Service | Root Directory | Build | Start |
+| --- | --- | --- | --- |
+| `api`  | `apps/api`     | `corepack enable && pnpm install --frozen-lockfile && pnpm prisma generate` | `pnpm prisma migrate deploy && node src/server.js` |
+| `web`  | `apps/web`     | `corepack enable && pnpm install --frozen-lockfile && pnpm build`           | `pnpm start` |
+| `Postgres` | (plugin)   | — | — |
 
-After both services have generated domains, update each side's env vars with the real URLs and let Railway redeploy. Seed the demo account with:
+The `api` service references the database with `DATABASE_URL=${{Postgres.DATABASE_URL}}` and the `web` service points `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_SOCKET_URL` at the API's public domain.
+
+**Full step-by-step instructions, env var reference, custom domains, and troubleshooting** live in **[DEPLOYMENT.md](./DEPLOYMENT.md)**. Read it before your first deploy — it covers the production cookie/CORS triangle, the `NEXT_PUBLIC_*` rebuild gotcha, and the Prisma migration prerequisite that catches most people.
+
+Seed the demo account once both services are live:
 
 ```bash
 railway run --service api pnpm db:seed
