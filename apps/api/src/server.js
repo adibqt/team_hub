@@ -11,4 +11,4 @@ const io = new Server(server, {
 app.set("io", io);
 registerSocketHandlers(io);
 
-server.listen(env.PORT, () => console.log(`API on :${env.PORT}`));
+server.listen(env.PORT, "0.0.0.0", () => console.log(`API on :${env.PORT}`));
