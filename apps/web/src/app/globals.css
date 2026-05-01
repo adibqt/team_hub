@@ -145,20 +145,19 @@ body {
   mix-blend-mode: var(--grain-blend);
 }
 
-/* ─── Dark "After Hours" atmosphere ──────────────────────────────
-   Layered ambient gradients that only render in `.dark` mode. They
-   imply a warm desk lamp + a distant cool window — depth without
-   washing out the editorial restraint. */
+/* ─── Auth atmosphere ─────────────────────────────────────────────
+   Light mode: "Morning Edition" (brighter paper bloom + calm sage wash)
+   Dark mode:  "After Hours"   (warmer ember glow + deeper contrast). */
 .aurora {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  opacity: 0;
+  opacity: 0.62;
   transition: opacity 600ms ease-out;
 }
 .dark .aurora {
-  opacity: 1;
+  opacity: 0.95;
 }
 .aurora::before,
 .aurora::after {
@@ -174,8 +173,8 @@ body {
   width: 56rem;
   height: 56rem;
   background: radial-gradient(closest-side,
-    rgb(var(--color-ember) / 0.22) 0%,
-    rgb(var(--color-ember) / 0.08) 40%,
+    rgb(var(--color-ember) / 0.14) 0%,
+    rgb(var(--color-ember) / 0.05) 40%,
     transparent 72%);
   animation: aurora-a 24s ease-in-out infinite;
 }
@@ -185,18 +184,42 @@ body {
   width: 50rem;
   height: 50rem;
   background: radial-gradient(closest-side,
-    rgb(var(--color-sage) / 0.16) 0%,
-    rgb(var(--color-sage) / 0.05) 45%,
+    rgb(var(--color-sage) / 0.11) 0%,
+    rgb(var(--color-sage) / 0.04) 45%,
     transparent 75%);
   animation: aurora-b 30s ease-in-out infinite;
 }
+.dark .aurora::before {
+  background: radial-gradient(closest-side,
+    rgb(var(--color-ember) / 0.22) 0%,
+    rgb(var(--color-ember) / 0.08) 40%,
+    transparent 72%);
+}
+.dark .aurora::after {
+  background: radial-gradient(closest-side,
+    rgb(var(--color-sage) / 0.16) 0%,
+    rgb(var(--color-sage) / 0.05) 45%,
+    transparent 75%);
+}
 
-/* Warm "desk-lamp" spotlight behind the form column. Light mode = none. */
+/* Spotlight behind the form column.
+   Light: warm morning wash. Dark: stronger desk-lamp bloom. */
 .spotlight {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0;
+  opacity: 0.68;
+  background:
+    radial-gradient(60% 50% at 80% 20%,
+      rgb(var(--color-ember) / 0.09) 0%,
+      transparent 70%),
+    radial-gradient(50% 60% at 20% 90%,
+      rgb(var(--color-sage) / 0.06) 0%,
+      transparent 70%);
+  transition: opacity 600ms ease-out;
+}
+.dark .spotlight {
+  opacity: 1;
   background:
     radial-gradient(60% 50% at 80% 20%,
       rgb(var(--color-ember) / 0.10) 0%,
@@ -204,16 +227,16 @@ body {
     radial-gradient(50% 60% at 20% 90%,
       rgb(var(--color-ember) / 0.06) 0%,
       transparent 70%);
-  transition: opacity 600ms ease-out;
-}
-.dark .spotlight {
-  opacity: 1;
 }
 
-/* Ember accents — the orange "." finally glows like a real ember
-   in dark mode. No effect in light mode (keeps the printed feel). */
+/* Ember accents — in light mode it's a warm printed ink bloom;
+   in dark mode it becomes a stronger live ember. */
 .ember-glow {
   display: inline-block;
+  text-shadow:
+    0 0 1px rgb(var(--color-ember) / 0.18),
+    0 0 8px rgb(var(--color-ember) / 0.12);
+  animation: ember-flicker-light 5.2s ease-in-out infinite;
 }
 .dark .ember-glow {
   text-shadow:
@@ -238,12 +261,19 @@ body {
   pointer-events: none;
   opacity: 0;
   background: linear-gradient(to bottom,
-    rgb(var(--color-ember) / 0.55) 0%,
+    rgb(var(--color-ember) / 0.30) 0%,
     transparent 100%);
   filter: blur(6px);
   transform: scaleX(0.2);
   transform-origin: left center;
   transition: opacity 240ms ease-out, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.field-shell:focus-within::after {
+  opacity: 0.72;
+  transform: scaleX(1);
+}
+.field-shell:focus-within .field-icon {
+  filter: drop-shadow(0 0 4px rgb(var(--color-ember) / 0.26));
 }
 .dark .field-shell:focus-within::after {
   opacity: 1;
@@ -253,8 +283,7 @@ body {
   filter: drop-shadow(0 0 6px rgb(var(--color-ember) / 0.55));
 }
 
-/* Submit button — dark mode gets a soft heat halo on hover/focus.
-   Light mode keeps the original flat behavior. */
+/* Submit button — both themes get glow; dark remains stronger. */
 .heat-btn {
   position: relative;
   isolation: isolate;
@@ -267,12 +296,21 @@ body {
   pointer-events: none;
   border-radius: inherit;
   background: radial-gradient(70% 120% at 50% 50%,
-    rgb(var(--color-ember) / 0.55) 0%,
-    rgb(var(--color-ember) / 0.20) 40%,
+    rgb(var(--color-ember) / 0.28) 0%,
+    rgb(var(--color-ember) / 0.13) 40%,
     transparent 75%);
   opacity: 0;
   filter: blur(14px);
   transition: opacity 320ms ease-out;
+}
+.heat-btn:hover:not(:disabled)::before,
+.heat-btn:focus-visible:not(:disabled)::before {
+  opacity: 1;
+}
+.heat-btn:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--color-paper) / 0.28),
+    0 8px 24px -10px rgb(var(--color-ink) / 0.32);
 }
 .dark .heat-btn:hover:not(:disabled)::before,
 .dark .heat-btn:focus-visible:not(:disabled)::before {
@@ -316,6 +354,7 @@ body {
   height: 6px;
   border-radius: 9999px;
   background: rgb(var(--color-ember));
+  box-shadow: 0 0 0 1px rgb(var(--color-paper)), 0 0 8px rgb(var(--color-ember) / 0.28);
 }
 .signal-dot::after {
   content: "";
@@ -356,6 +395,23 @@ body {
       0 0 10px rgb(var(--color-ember) / 0.85),
       0 0 22px rgb(var(--color-ember) / 0.55),
       0 0 40px rgb(var(--color-ember) / 0.30);
+  }
+}
+@keyframes ember-flicker-light {
+  0%, 100% {
+    text-shadow:
+      0 0 1px rgb(var(--color-ember) / 0.18),
+      0 0 8px rgb(var(--color-ember) / 0.12);
+  }
+  48% {
+    text-shadow:
+      0 0 1px rgb(var(--color-ember) / 0.10),
+      0 0 6px rgb(var(--color-ember) / 0.08);
+  }
+  52% {
+    text-shadow:
+      0 0 2px rgb(var(--color-ember) / 0.28),
+      0 0 11px rgb(var(--color-ember) / 0.20);
   }
 }
 @keyframes shimmer {

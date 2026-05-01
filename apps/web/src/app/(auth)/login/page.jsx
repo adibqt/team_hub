@@ -33,6 +33,14 @@ function useNowHHMM() {
   return stamp;
 }
 
+function getEditionLabel() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "Morning edition";
+  if (hour >= 12 && hour < 18) return "Day shift";
+  if (hour >= 18 && hour < 22) return "Evening desk";
+  return "After hours";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -42,6 +50,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const now = useNowHHMM();
+  const [edition, setEdition] = useState("Morning edition");
+
+  useEffect(() => {
+    setEdition(getEditionLabel());
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -76,7 +89,7 @@ export default function LoginPage() {
         <span className="hidden sm:inline-flex items-center gap-2">
           <span aria-hidden="true" className="signal-dot" />
           <span className="text-ink/45">
-            Channel <span className="text-ink/70">open</span>
+            <span className="text-ink/70">{edition}</span>
           </span>
           {now && (
             <>
