@@ -99,44 +99,90 @@ export const useWorkspaceStore = create((set, get) => ({
   },
 
   changeMemberRole: async (id, userId, role) => {
-    const { data } = await api.patch(`/api/workspaces/${id}/members/${userId}`, { role });
-    set((state) => {
-      const ws = state.workspaceById[id];
-      if (!ws) return {};
-      return {
+    const prevWs = get().workspaceById[id];
+    const prevMember = prevWs?.members?.find((m) => m.userId === userId);
+
+    // Optimistic — flip the role locally first.
+    if (prevWs && prevMember) {
+      set((state) => ({
         workspaceById: {
           ...state.workspaceById,
           [id]: {
-            ...ws,
-            members: ws.members.map((m) =>
-              m.userId === userId ? { ...m, ...data } : m
+            ...prevWs,
+            members: prevWs.members.map((m) =>
+              m.userId === userId ? { ...m, role } : m
             ),
           },
         },
-      };
-    });
-    return data;
+      }));
+    }
+
+    try {
+      const { data } = await api.patch(`/api/workspaces/${id}/members/${userId}`, { role });
+      set((state) => {
+        const ws = state.workspaceById[id];
+        if (!ws) return {};
+        return {
+          workspaceById: {
+            ...state.workspaceById,
+            [id]: {
+              ...ws,
+              members: ws.members.map((m) =>
+                m.userId === userId ? { ...m, ...data } : m
+              ),
+            },
+          },
+        };
+      });
+      return data;
+    } catch (err) {
+      if (prevWs && prevMember) {
+        set((state) => ({
+          workspaceById: {
+            ...state.workspaceById,
+            [id]: {
+              ...prevWs,
+              members: prevWs.members.map((m) =>
+                m.userId === userId ? prevMember : m
+              ),
+            },
+          },
+        }));
+      }
+      throw err;
+    }
   },
 
   removeMember: async (id, userId) => {
-    await api.delete(`/api/workspaces/${id}/members/${userId}`);
     const me = useAuthStore.getState().user;
     const removingSelf = me?.id === userId;
-    set((state) => {
-      const ws = state.workspaceById[id];
-      return {
-        workspaceById: ws
-          ? {
-              ...state.workspaceById,
-              [id]: { ...ws, members: ws.members.filter((m) => m.userId !== userId) },
-            }
-          : state.workspaceById,
-        // Self-leave -> drop the workspace from the user's list entirely.
-        workspaces: removingSelf
-          ? state.workspaces.filter((w) => w.id !== id)
-          : state.workspaces,
-      };
-    });
+
+    const prevWs = get().workspaceById[id];
+    const prevWorkspaces = get().workspaces;
+
+    // Optimistic removal.
+    set((state) => ({
+      workspaceById: prevWs
+        ? {
+            ...state.workspaceById,
+            [id]: { ...prevWs, members: prevWs.members.filter((m) => m.userId !== userId) },
+          }
+        : state.workspaceById,
+      workspaces: removingSelf
+        ? state.workspaces.filter((w) => w.id !== id)
+        : state.workspaces,
+    }));
+
+    try {
+      await api.delete(`/api/workspaces/${id}/members/${userId}`);
+    } catch (err) {
+      // Roll back — put the member (and the workspace, if self-leave) back.
+      set((state) => ({
+        workspaceById: prevWs ? { ...state.workspaceById, [id]: prevWs } : state.workspaceById,
+        workspaces: removingSelf ? prevWorkspaces : state.workspaces,
+      }));
+      throw err;
+    }
   },
 
   removeWorkspace: async (id) => {

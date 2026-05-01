@@ -35,12 +35,18 @@ export const useNotificationsStore = create((set, get) => ({
     try {
       await api.patch(`/api/notifications/${id}/read`);
     } catch {
-      // Swallow — the user has already moved on; reload will reconcile.
+      // Roll back — request failed, restore prior unread state.
+      set((state) => ({
+        items: state.items.map((n) => (n.id === id ? before : n)),
+        unreadCount: state.unreadCount + 1,
+      }));
     }
   },
 
   markAllRead: async () => {
     if (get().unreadCount === 0) return;
+    const prevItems = get().items;
+    const prevUnread = get().unreadCount;
     const stamp = new Date().toISOString();
     set((state) => ({
       items: state.items.map((n) => (n.readAt ? n : { ...n, readAt: stamp })),
@@ -49,7 +55,8 @@ export const useNotificationsStore = create((set, get) => ({
     try {
       await api.post("/api/notifications/read-all");
     } catch {
-      // Same — best-effort; the next load will re-sync if it failed.
+      // Roll back — restore prior list and count.
+      set({ items: prevItems, unreadCount: prevUnread });
     }
   },
 }));

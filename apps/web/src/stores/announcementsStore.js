@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import api from "@/lib/api";
+import { useAuthStore } from "@/stores/authStore";
 
 /* ────────────────────────────────────────────────────────────────
    Pinned-first ordering matches the API; keep it consistent in the
@@ -125,28 +126,113 @@ export const useAnnouncementsStore = create((set, get) => ({
   },
 
   toggleReaction: async (announcementId, emoji) => {
-    const { data } = await api.post(`/api/announcements/${announcementId}/reactions`, {
-      emoji,
-    });
+    const me = useAuthStore.getState().user;
+    if (!me?.id) {
+      // No identity to attribute the reaction to — fall back to non-optimistic.
+      const { data } = await api.post(`/api/announcements/${announcementId}/reactions`, { emoji });
+      set((state) => ({
+        announcements: sortAnnouncements(
+          state.announcements.map((a) => (a.id === announcementId ? { ...a, ...data } : a))
+        ),
+      }));
+      return data;
+    }
+
+    const snapshot = get().announcements.find((a) => a.id === announcementId);
+
     set((state) => ({
       announcements: sortAnnouncements(
-        state.announcements.map((a) => (a.id === announcementId ? { ...a, ...data } : a))
+        state.announcements.map((a) => {
+          if (a.id !== announcementId) return a;
+          const reactions = Array.isArray(a.reactions) ? a.reactions : [];
+          const idx = reactions.findIndex((r) => r.userId === me.id && r.emoji === emoji);
+          if (idx >= 0) {
+            return { ...a, reactions: reactions.filter((_, i) => i !== idx) };
+          }
+          return {
+            ...a,
+            reactions: [
+              ...reactions,
+              { id: `optimistic-${me.id}-${emoji}-${Date.now()}`, announcementId, userId: me.id, emoji },
+            ],
+          };
+        })
       ),
     }));
-    return data;
+
+    try {
+      const { data } = await api.post(`/api/announcements/${announcementId}/reactions`, { emoji });
+      set((state) => ({
+        announcements: sortAnnouncements(
+          state.announcements.map((a) => (a.id === announcementId ? { ...a, ...data } : a))
+        ),
+      }));
+      return data;
+    } catch (err) {
+      if (snapshot) {
+        set((state) => ({
+          announcements: sortAnnouncements(
+            state.announcements.map((a) => (a.id === announcementId ? snapshot : a))
+          ),
+        }));
+      }
+      throw err;
+    }
   },
 
   addComment: async (announcementId, body, mentions = []) => {
-    const { data } = await api.post(`/api/announcements/${announcementId}/comments`, {
-      body,
-      mentions,
-    });
-    set((state) => ({
-      announcements: sortAnnouncements(
-        state.announcements.map((a) => (a.id === announcementId ? { ...a, ...data } : a))
-      ),
-    }));
-    return data;
+    const me = useAuthStore.getState().user;
+    const snapshot = get().announcements.find((a) => a.id === announcementId);
+    const tempId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    if (me?.id) {
+      const optimisticComment = {
+        id: tempId,
+        announcementId,
+        authorId: me.id,
+        body,
+        mentions,
+        createdAt: new Date().toISOString(),
+        author: {
+          id: me.id,
+          name: me.name || null,
+          email: me.email || null,
+          avatarUrl: me.avatarUrl || null,
+        },
+        _optimistic: true,
+      };
+      set((state) => ({
+        announcements: sortAnnouncements(
+          state.announcements.map((a) =>
+            a.id === announcementId
+              ? { ...a, comments: [...(a.comments || []), optimisticComment] }
+              : a
+          )
+        ),
+      }));
+    }
+
+    try {
+      const { data } = await api.post(`/api/announcements/${announcementId}/comments`, {
+        body,
+        mentions,
+      });
+      set((state) => ({
+        announcements: sortAnnouncements(
+          state.announcements.map((a) => (a.id === announcementId ? { ...a, ...data } : a))
+        ),
+      }));
+      return data;
+    } catch (err) {
+      if (snapshot) {
+        set((state) => ({
+          announcements: sortAnnouncements(
+            state.announcements.map((a) => (a.id === announcementId ? snapshot : a))
+          ),
+        }));
+      }
+      throw err;
+    }
   },
 
   /* ────────────────────────  SOCKET REDUCERS  ──────────────────────── */
