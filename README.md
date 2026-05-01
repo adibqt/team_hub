@@ -2,7 +2,6 @@
 
 A collaborative team hub where teams manage shared **goals**, post **announcements**, and track **action items** in real time. Built as a Turborepo monorepo with a Next.js 14 frontend and an Express + Prisma backend, deployed on Railway.
 
-> Submitted as part of the FredoCloud Technical Assessment.
 
 ---
 
