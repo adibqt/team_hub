@@ -346,70 +346,104 @@ function PriorityChip({ priority }) {
 
 function ListView({ items, workspaceId, me, onDelete }) {
   return (
-    <div className="border border-ink/10">
-      <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-4 px-4 py-2 bg-paper-50 border-b border-ink/10 font-mono text-[9px] uppercase tracking-widest2 text-ink/45">
-        <span>Title</span>
-        <span>Status</span>
-        <span>Priority</span>
-        <span>Due</span>
-        <span>Assignee</span>
-        <span aria-hidden="true" />
-      </div>
-      <ul className="divide-y divide-ink/10">
-        {items.map((item) => {
-          const due = dueLabel(item.dueDate);
-          return (
-            <li
-              key={item.id}
-              className={`group grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-4 px-4 py-3 hover:bg-paper-50 transition-colors ${
-                item._pending ? "opacity-60" : ""
-              }`}
-            >
-              <div className="min-w-0">
-                <p className="text-[14px] text-ink truncate">{item.title}</p>
-                {item.goal && (
-                  <Link
-                    href={`/w/${workspaceId}/goals/${item.goal.id}`}
-                    className="inline-flex items-center gap-1.5 mt-0.5 font-mono text-[9px] uppercase tracking-widest2 text-ink/45 hover:text-ember transition-colors"
-                  >
-                    <Target size={10} strokeWidth={1.75} aria-hidden="true" />
-                    <span className="normal-case tracking-normal text-[11px] font-sans truncate max-w-[18rem]">
-                      {item.goal.title}
-                    </span>
-                  </Link>
-                )}
-              </div>
-              <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/65 tabular-nums">
-                {item.status.replace("_", " ")}
-              </span>
-              <PriorityChip priority={item.priority} />
-              <span className={`font-mono text-[10px] uppercase tracking-widest2 tabular-nums ${due?.tone || "text-ink/35"}`}>
-                {due?.text || "—"}
-              </span>
-              {item.assignee ? (
-                <span className="inline-flex items-center gap-2">
-                  <Avatar user={item.assignee} size="xs" />
-                  <span className="text-[12px] text-ink/75 hidden sm:inline">
-                    {item.assignee.name}
-                    {item.assignee.id === me?.id && <span className="text-ember"> · you</span>}
-                  </span>
-                </span>
-              ) : (
-                <span className="font-mono text-[9px] uppercase tracking-widest2 text-ink/35">Unassigned</span>
-              )}
-              <button
-                type="button"
-                onClick={() => onDelete(item.id)}
-                disabled={item._pending}
-                aria-label="Delete item"
-                className="opacity-0 group-hover:opacity-100 p-1 text-ink/35 hover:text-ember focus:opacity-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-ember transition-opacity"
+    <div className="border border-ink/10 overflow-x-auto">
+      <table className="w-full min-w-[980px] border-collapse table-fixed">
+        <colgroup>
+          <col />
+          <col className="w-[110px]" />
+          <col className="w-[110px]" />
+          <col className="w-[130px]" />
+          <col className="w-[170px]" />
+          <col className="w-[44px]" />
+        </colgroup>
+        <thead className="bg-paper-50 border-b border-ink/10">
+          <tr className="font-mono text-[9px] uppercase tracking-widest2 text-ink/45">
+            <th scope="col" className="text-left font-normal px-4 py-2">
+              Title
+            </th>
+            <th scope="col" className="text-left font-normal px-4 py-2">
+              Status
+            </th>
+            <th scope="col" className="text-left font-normal px-4 py-2">
+              Priority
+            </th>
+            <th scope="col" className="text-left font-normal px-4 py-2">
+              Due
+            </th>
+            <th scope="col" className="text-left font-normal px-4 py-2">
+              Assignee
+            </th>
+            <th scope="col" className="px-4 py-2" aria-hidden="true" />
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => {
+            const due = dueLabel(item.dueDate);
+            return (
+              <tr
+                key={item.id}
+                className={`group border-b border-ink/10 last:border-b-0 hover:bg-paper-50 transition-colors ${
+                  item._pending ? "opacity-60" : ""
+                }`}
               >
-                <Trash2 size={12} strokeWidth={1.75} />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                <td className="px-4 py-3 align-middle">
+                  <div className="min-w-0">
+                    <p className="text-[14px] text-ink truncate">{item.title}</p>
+                    {item.goal && (
+                      <Link
+                        href={`/w/${workspaceId}/goals/${item.goal.id}`}
+                        className="inline-flex items-center gap-1.5 mt-0.5 font-mono text-[9px] uppercase tracking-widest2 text-ink/45 hover:text-ember transition-colors"
+                      >
+                        <Target size={10} strokeWidth={1.75} aria-hidden="true" />
+                        <span className="normal-case tracking-normal text-[11px] font-sans truncate max-w-[18rem]">
+                          {item.goal.title}
+                        </span>
+                      </Link>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3 align-middle">
+                  <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/65 tabular-nums">
+                    {item.status.replace("_", " ")}
+                  </span>
+                </td>
+                <td className="px-4 py-3 align-middle">
+                  <PriorityChip priority={item.priority} />
+                </td>
+                <td className="px-4 py-3 align-middle">
+                  <span className={`font-mono text-[10px] uppercase tracking-widest2 tabular-nums ${due?.tone || "text-ink/35"}`}>
+                    {due?.text || "—"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 align-middle">
+                  {item.assignee ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Avatar user={item.assignee} size="xs" />
+                      <span className="text-[12px] text-ink/75 hidden sm:inline">
+                        {item.assignee.name}
+                        {item.assignee.id === me?.id && <span className="text-ember"> · you</span>}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="font-mono text-[9px] uppercase tracking-widest2 text-ink/35">Unassigned</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 align-middle">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(item.id)}
+                    disabled={item._pending}
+                    aria-label="Delete item"
+                    className="opacity-0 group-hover:opacity-100 p-1 text-ink/35 hover:text-ember focus:opacity-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-ember transition-opacity"
+                  >
+                    <Trash2 size={12} strokeWidth={1.75} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

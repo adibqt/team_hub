@@ -26,6 +26,7 @@ import { useNotificationsStore } from "@/stores/notificationsStore";
 import UserMenu from "@/components/UserMenu";
 import NotificationBell from "@/components/NotificationBell";
 import CreateWorkspaceModal from "@/components/workspaces/CreateWorkspaceModal";
+import OfflineBanner from "@/components/OfflineBanner";
 import { getSocket } from "@/lib/socket";
 import { useWorkspaceLive } from "@/lib/useWorkspaceLive";
 
@@ -340,6 +341,7 @@ export default function AppLayout({ children }) {
 
       <main className="relative z-10 flex-1 overflow-auto pt-14 lg:pt-0">{children}</main>
 
+      <OfflineBanner />
       <CreateWorkspaceModal open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
   );

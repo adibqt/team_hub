@@ -265,6 +265,29 @@ export const useGoalsStore = create((set, get) => ({
     return data;
   },
 
+  // Offline replay finished a queued POST — swap optimistic placeholders.
+  reconcileTempId: (tempId, real, url) => {
+    if (!tempId || !real?.id) return;
+    if (typeof url === "string" && url.includes("/milestones")) {
+      // milestone create
+      const goalId = real.goalId;
+      if (!goalId) return;
+      set((state) =>
+        patchGoalMilestones(state, goalId, (ms) => {
+          const cleaned = ms.filter((m) => m.id !== tempId && m.id !== real.id);
+          return [...cleaned, real];
+        })
+      );
+      return;
+    }
+    // goal create
+    set((state) => {
+      const cleaned = state.goals.filter((g) => g.id !== tempId && g.id !== real.id);
+      const hadTemp = state.goals.some((g) => g.id === tempId);
+      return { goals: hadTemp ? [real, ...cleaned] : state.goals };
+    });
+  },
+
   pushUpdate: (update) => {
     if (!update?.id || !update.goalId) return;
     set((state) => {
@@ -279,3 +302,13 @@ export const useGoalsStore = create((set, get) => ({
     });
   },
 }));
+
+if (typeof window !== "undefined") {
+  window.addEventListener("offline:idmap", (e) => {
+    const { tempId, real, url } = e.detail || {};
+    if (typeof url !== "string") return;
+    if (url.includes("/goals") || url.includes("/milestones")) {
+      useGoalsStore.getState().reconcileTempId(tempId, real, url);
+    }
+  });
+}

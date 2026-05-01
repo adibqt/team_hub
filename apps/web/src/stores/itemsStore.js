@@ -86,4 +86,26 @@ export const useItemsStore = create((set, get) => ({
     if (!id) return;
     set({ items: get().items.filter((i) => i.id !== id) });
   },
+
+  // Offline replay finished a queued POST — swap the optimistic placeholder
+  // for the canonical record. Idempotent: if the temp id is gone or the real
+  // id is already present, no-op.
+  reconcileTempId: (tempId, real) => {
+    if (!tempId || !real?.id) return;
+    set((state) => {
+      const cleaned = state.items.filter((i) => i.id !== tempId && i.id !== real.id);
+      const hadTemp = state.items.some((i) => i.id === tempId);
+      return { items: hadTemp ? [real, ...cleaned] : state.items };
+    });
+  },
 }));
+
+if (typeof window !== "undefined") {
+  window.addEventListener("offline:idmap", (e) => {
+    const { tempId, real, url } = e.detail || {};
+    // Only react to item creates; goal creates fire the same event.
+    if (typeof url === "string" && url.includes("/items")) {
+      useItemsStore.getState().reconcileTempId(tempId, real);
+    }
+  });
+}
