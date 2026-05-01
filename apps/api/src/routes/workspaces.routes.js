@@ -4,6 +4,7 @@ import { prisma } from "../config/prisma.js";
 import { requireAuth, requireMember, requireAdmin } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
 import { sendInviteEmail } from "../services/mailer.js";
+import { listResponse } from "../utils/http.js";
 
 const r = Router();
 
@@ -17,6 +18,13 @@ r.post("/", requireAuth, async (req, res, next) => {
     if (!name || typeof name !== "string") {
       return res.status(400).json({ error: "Workspace name is required" });
     }
+    if (
+      accentColor !== undefined &&
+      (typeof accentColor !== "string" || !/^#[0-9A-Fa-f]{6}$/.test(accentColor))
+    ) {
+      return res.status(400).json({ error: "accentColor must be a valid hex color like #2563EB" });
+    }
+
     const workspace = await prisma.workspace.create({
       data: {
         name: name.trim(),
@@ -54,7 +62,8 @@ r.get("/", requireAuth, async (req, res, next) => {
       },
       orderBy: { joinedAt: "asc" },
     });
-    res.json(memberships.map((m) => ({ ...m.workspace, role: m.role })));
+    const items = memberships.map((m) => ({ ...m.workspace, role: m.role }));
+    res.json(listResponse(items, { total: items.length }));
   } catch (e) {
     next(e);
   }
@@ -117,7 +126,21 @@ r.patch("/:id", requireAuth, requireMember, requireAdmin, async (req, res, next)
 
 r.delete("/:id", requireAuth, requireMember, requireAdmin, async (req, res, next) => {
   try {
-    await prisma.workspace.delete({ where: { id: req.params.id } });
+    const ws = await prisma.workspace.findUnique({ where: { id: req.params.id } });
+    if (!ws) return res.status(404).json({ error: "Not found" });
+
+    // Record the destructive action *before* the cascade. Once deleted,
+    // related audit rows will SetNull their workspaceId — we keep
+    // `workspaceName` snapshot so historical entries remain attributable.
+    await logAudit({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      actorId: req.userId,
+      action: "workspace.delete",
+      entity: { type: "Workspace", id: ws.id },
+      before: { name: ws.name, description: ws.description, accentColor: ws.accentColor },
+    });
+    await prisma.workspace.delete({ where: { id: ws.id } });
     res.json({ ok: true });
   } catch (e) {
     next(e);
@@ -137,7 +160,7 @@ r.get("/:id/members", requireAuth, requireMember, async (req, res, next) => {
       },
       orderBy: [{ role: "asc" }, { joinedAt: "asc" }],
     });
-    res.json(members);
+    res.json(listResponse(members, { total: members.length }));
   } catch (e) {
     next(e);
   }
@@ -310,7 +333,8 @@ r.get("/:id/invites", requireAuth, requireMember, requireAdmin, async (req, res,
       orderBy: { createdAt: "desc" },
     });
     const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
-    res.json(invites.map((i) => ({ ...i, inviteUrl: `${clientUrl}/invite/${i.token}` })));
+    const items = invites.map((i) => ({ ...i, inviteUrl: `${clientUrl}/invite/${i.token}` }));
+    res.json(listResponse(items, { total: items.length }));
   } catch (e) {
     next(e);
   }

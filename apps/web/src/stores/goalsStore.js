@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import api from "@/lib/api";
+import { readList } from "@/lib/http";
 
 /* ────────────────────────────────────────────────────────────────
    Helpers — keep the list and detail caches consistent. Every
@@ -29,8 +30,9 @@ export const useGoalsStore = create((set, get) => ({
 
   load: async (wsId) => {
     const { data } = await api.get(`/api/workspaces/${wsId}/goals`);
-    set({ goals: data });
-    return data;
+    const items = readList(data);
+    set({ goals: items });
+    return items;
   },
 
   pushGoal: (goal) => {
@@ -241,10 +243,11 @@ export const useGoalsStore = create((set, get) => ({
 
   loadUpdates: async (goalId) => {
     const { data } = await api.get(`/api/goals/${goalId}/updates`);
+    const items = readList(data);
     set((state) => ({
-      updatesByGoalId: { ...state.updatesByGoalId, [goalId]: data },
+      updatesByGoalId: { ...state.updatesByGoalId, [goalId]: items },
     }));
-    return data;
+    return items;
   },
 
   postUpdate: async (goalId, body) => {

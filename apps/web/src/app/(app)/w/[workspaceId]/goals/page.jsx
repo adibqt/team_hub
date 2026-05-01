@@ -73,7 +73,6 @@ export default function GoalsPage() {
       .finally(() => mounted && setLoading(false));
 
     const s = getSocket();
-    s.emit("workspace:join", workspaceId);
     const onCreated = (g) => pushGoal(g);
     const onUpdated = (g) => applyGoalUpdate(g);
     const onMilestoneCreated = (m) => pushMilestone(m);

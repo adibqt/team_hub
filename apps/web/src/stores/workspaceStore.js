@@ -1,21 +1,32 @@
 import { create } from "zustand";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
+import { readList } from "@/lib/http";
 
 export const useWorkspaceStore = create((set, get) => ({
   workspaces: [],
-  activeWorkspaceId:
-    typeof window !== "undefined" ? localStorage.getItem("activeWsId") : null,
+  activeWorkspaceId: null,
 
   // Per-workspace state, keyed by id so we don't trash one workspace's state
   // when someone switches to another.
   workspaceById: {},   // { [id]: { ...workspace, members, viewerRole } }
   invitesById: {},     // { [id]: Invite[] }
 
+  hydrateActiveWorkspace: () => {
+    if (typeof window === "undefined") return;
+    try {
+      const id = window.localStorage.getItem("activeWsId");
+      set({ activeWorkspaceId: id || null });
+    } catch {
+      set({ activeWorkspaceId: null });
+    }
+  },
+
   load: async () => {
     const { data } = await api.get("/api/workspaces");
-    set({ workspaces: data });
-    return data;
+    const items = readList(data);
+    set({ workspaces: items });
+    return items;
   },
 
   setActive: (id) => {
@@ -73,8 +84,9 @@ export const useWorkspaceStore = create((set, get) => ({
 
   loadInvites: async (id) => {
     const { data } = await api.get(`/api/workspaces/${id}/invites`);
-    set((state) => ({ invitesById: { ...state.invitesById, [id]: data } }));
-    return data;
+    const items = readList(data);
+    set((state) => ({ invitesById: { ...state.invitesById, [id]: items } }));
+    return items;
   },
 
   inviteMember: async (id, { email, role }) => {

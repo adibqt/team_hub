@@ -7,6 +7,8 @@ import {
   requireAdmin,
 } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
+import { sendMentionEmail } from "../services/mailer.js";
+import { listResponse, parsePagination } from "../utils/http.js";
 
 const r = Router();
 
@@ -207,6 +209,10 @@ r.get(
   requireMember,
   async (req, res, next) => {
     try {
+      // Cap page size so a workspace with thousands of announcements
+      // can't blow up memory in a single request. Existing clients that
+      // don't pass a page get the most recent page only.
+      const { take, page, skip } = parsePagination(req.query, { takeDefault: 50, takeMax: 100 });
       const announcements = await prisma.announcement.findMany({
         where: { workspaceId: req.params.wsId },
         include: {
@@ -219,9 +225,12 @@ r.get(
           reactions: true,
         },
         orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
+        skip,
+        take,
       });
       const hydrated = await attachAuthors(announcements);
-      res.json(hydrated);
+      const total = await prisma.announcement.count({ where: { workspaceId: req.params.wsId } });
+      res.json(listResponse(hydrated, { total, page, take }));
     } catch (e) {
       next(e);
     }
@@ -401,26 +410,89 @@ r.post("/announcements/:id/comments", requireAuth, async (req, res, next) => {
 
     const io = req.app.get("io");
     // De-dupe mentions and never notify the author about their own comment.
-    const targets = [...new Set(comment.mentions || [])].filter(
+    const requested = [...new Set(comment.mentions || [])].filter(
       (id) => id && id !== req.userId
     );
-    for (const userId of targets) {
-      const note = await prisma.notification.create({
-        data: {
+
+    // Restrict mention recipients to actual members of this workspace —
+    // otherwise an attacker could push notifications to arbitrary users.
+    let targets = [];
+    let workspace = null;
+    let recipientsById = new Map();
+    if (requested.length) {
+      const [members, ws] = await Promise.all([
+        prisma.membership.findMany({
+          where: { workspaceId: announcement.workspaceId, userId: { in: requested } },
+          include: { user: { select: { id: true, email: true, name: true } } },
+        }),
+        prisma.workspace.findUnique({
+          where: { id: announcement.workspaceId },
+          select: { id: true, name: true, accentColor: true },
+        }),
+      ]);
+      workspace = ws;
+      recipientsById = new Map(members.map((m) => [m.userId, m.user]));
+      targets = members.map((m) => m.userId);
+    }
+    const preview = trimmed.length > 140 ? trimmed.slice(0, 137) + "…" : trimmed;
+    const emailPreview = trimmed.length > 140 ? trimmed.slice(0, 137) + "..." : trimmed;
+    const announcementUrl = `${process.env.CLIENT_URL || "http://localhost:3000"}/w/${
+      announcement.workspaceId
+    }/announcements#a-${announcement.id}`;
+
+    if (targets.length) {
+      const payloadBase = {
+        commentId: comment.id,
+        announcementId: req.params.id,
+        workspaceId: announcement.workspaceId,
+        actorId: req.userId,
+        actorName: comment.author?.name || null,
+        announcementTitle: announcement.title,
+        preview,
+      };
+      await prisma.notification.createMany({
+        data: targets.map((userId) => ({
           userId,
           type: "mention",
-          payload: {
-            commentId: comment.id,
-            announcementId: req.params.id,
-            workspaceId: announcement.workspaceId,
-            actorId: req.userId,
-            actorName: comment.author?.name || null,
-            announcementTitle: announcement.title,
-            preview: trimmed.length > 140 ? trimmed.slice(0, 137) + "…" : trimmed,
-          },
-        },
+          payload: payloadBase,
+        })),
       });
-      io.to(`user:${userId}`).emit("notification:new", note);
+      // Re-fetch the freshly-created rows so we can emit them with stable ids.
+      const fresh = await prisma.notification.findMany({
+        where: {
+          userId: { in: targets },
+          type: "mention",
+          createdAt: { gte: new Date(Date.now() - 60_000) },
+          // payload->>'commentId' filtering isn't portable across Prisma versions;
+          // narrow by commentId in JS instead.
+        },
+        orderBy: { createdAt: "desc" },
+        take: targets.length * 2,
+      });
+      const byUser = new Map();
+      for (const n of fresh) {
+        if (n.payload?.commentId === comment.id && !byUser.has(n.userId)) {
+          byUser.set(n.userId, n);
+        }
+      }
+      for (const userId of targets) {
+        const note = byUser.get(userId);
+        if (note) io.to(`user:${userId}`).emit("notification:new", note);
+
+        const recipient = recipientsById.get(userId);
+        if (recipient?.email) {
+          await sendMentionEmail({
+            to: recipient.email,
+            recipientName: recipient.name,
+            actorName: comment.author?.name || "Someone",
+            workspaceName: workspace?.name || "your workspace",
+            workspaceAccent: workspace?.accentColor || "#2563EB",
+            announcementTitle: announcement.title,
+            commentPreview: emailPreview,
+            announcementUrl,
+          });
+        }
+      }
     }
 
     const updated = await loadAnnouncementForFeed(req.params.id);

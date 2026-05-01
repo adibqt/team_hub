@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 import { requireAuth, requireMember } from "../middleware/auth.js";
+import { listResponse } from "../utils/http.js";
 
 const r = Router();
 
@@ -8,7 +9,7 @@ r.get("/:id/analytics/summary", requireAuth, requireMember, async (req, res, nex
   try {
     const wsId = req.params.id;
     const now = new Date();
-    const weekAgo = new Date(now - 7 * 24 * 3600 * 1000);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
 
     const [totalGoals, itemsCompletedThisWeek, overdueGoals, overdueItems] = await Promise.all([
       prisma.goal.count({ where: { workspaceId: wsId } }),
@@ -28,24 +29,37 @@ r.get("/:id/analytics/summary", requireAuth, requireMember, async (req, res, nex
 r.get("/:id/analytics/completion", requireAuth, requireMember, async (req, res, next) => {
   try {
     const wsId = req.params.id;
+    const WEEK_MS = 7 * 24 * 3600 * 1000;
+    const now = new Date();
+    const earliest = new Date(now.getTime() - 7 * WEEK_MS);
+
+    // Pull just completedAt for the window in a single query, then bucket
+    // in JS — avoids 8 sequential DB round-trips.
+    const completed = await prisma.goal.findMany({
+      where: {
+        workspaceId: wsId,
+        status: "COMPLETED",
+        completedAt: { gte: earliest },
+      },
+      select: { completedAt: true },
+    });
+
     const weeks = [];
     for (let i = 7; i >= 0; i--) {
-      const start = new Date();
-      start.setDate(start.getDate() - i * 7);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
+      const start = new Date(now.getTime() - i * WEEK_MS);
+      const end = new Date(start.getTime() + WEEK_MS);
       const year = start.getFullYear();
       const week = Math.ceil(((start - new Date(year, 0, 1)) / 86400000 + 1) / 7);
-      const count = await prisma.goal.count({
-        where: { workspaceId: wsId, status: "COMPLETED", createdAt: { gte: start, lt: end } },
-      });
+      const count = completed.filter(
+        (g) => g.completedAt && g.completedAt >= start && g.completedAt < end
+      ).length;
       weeks.push({
         week: `${year}-W${String(week).padStart(2, "0")}`,
         weekStart: start.toISOString(),
         completed: count,
       });
     }
-    res.json(weeks);
+    res.json(listResponse(weeks, { total: weeks.length }));
   } catch (e) { next(e); }
 });
 

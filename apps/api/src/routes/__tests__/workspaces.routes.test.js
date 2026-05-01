@@ -138,10 +138,13 @@ describe("GET /api/workspaces (list)", () => {
       .set("Cookie", accessCookie("u1"));
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual([
-      { id: "ws1", name: "Eng", _count: { members: 3, goals: 2 }, role: "ADMIN" },
-      { id: "ws2", name: "Design", _count: { members: 5, goals: 1 }, role: "MEMBER" },
-    ]);
+    expect(res.body).toEqual({
+      items: [
+        { id: "ws1", name: "Eng", _count: { members: 3, goals: 2 }, role: "ADMIN" },
+        { id: "ws2", name: "Design", _count: { members: 5, goals: 1 }, role: "MEMBER" },
+      ],
+      total: 2,
+    });
   });
 });
 

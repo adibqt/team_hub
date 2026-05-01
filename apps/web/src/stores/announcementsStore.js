@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import api from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
+import { readList } from "@/lib/http";
 
 /* ────────────────────────────────────────────────────────────────
    Pinned-first ordering matches the API; keep it consistent in the
@@ -21,8 +22,9 @@ export const useAnnouncementsStore = create((set, get) => ({
   load: async (wsId) => {
     set({ loadedFor: wsId });
     const { data } = await api.get(`/api/workspaces/${wsId}/announcements`);
-    set({ announcements: sortAnnouncements(data) });
-    return data;
+    const items = readList(data);
+    set({ announcements: sortAnnouncements(items) });
+    return items;
   },
 
   reset: () => set({ announcements: [], loadedFor: null }),

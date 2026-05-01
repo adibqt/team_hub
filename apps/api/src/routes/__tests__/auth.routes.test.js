@@ -63,13 +63,14 @@ describe("POST /api/auth/register", () => {
       id: "u1",
       email: "a@b.com",
       name: "Alice",
+      tokenVersion: 0,
     });
 
     const res = await request(app)
       .post("/api/auth/register")
       .send({ email: "a@b.com", password: "secret123", name: "Alice" });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201);
     expect(res.body).toEqual({ id: "u1", email: "a@b.com", name: "Alice" });
 
     expect(bcrypt.hash).toHaveBeenCalledWith("secret123", 10);
@@ -84,6 +85,15 @@ describe("POST /api/auth/register", () => {
     expect(verifyRefresh(cookies.refresh).sub).toBe("u1");
   });
 
+  it("returns 400 when the password fails server-side validation", async () => {
+    const res = await request(app)
+      .post("/api/auth/register")
+      .send({ email: "a@b.com", password: "x", name: "Alice" });
+
+    expect(res.status).toBe(400);
+    expect(prisma.user.create).not.toHaveBeenCalled();
+  });
+
   it("returns 409 when the email is already taken (Prisma P2002)", async () => {
     bcrypt.hash.mockResolvedValue("hashed-pw");
     const dupErr = Object.assign(new Error("dup"), { code: "P2002" });
@@ -91,14 +101,14 @@ describe("POST /api/auth/register", () => {
 
     const res = await request(app)
       .post("/api/auth/register")
-      .send({ email: "a@b.com", password: "x", name: "Alice" });
+      .send({ email: "a@b.com", password: "secret123", name: "Alice" });
 
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ error: "Email already in use" });
     expect(res.headers["set-cookie"]).toBeUndefined();
   });
 
-  it("forwards unknown DB errors to the error middleware (500)", async () => {
+  it("returns a generic 500 message for unexpected DB failures", async () => {
     bcrypt.hash.mockResolvedValue("hashed-pw");
     prisma.user.create.mockRejectedValue(new Error("connection lost"));
 
@@ -106,11 +116,11 @@ describe("POST /api/auth/register", () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => {});
     const res = await request(app)
       .post("/api/auth/register")
-      .send({ email: "a@b.com", password: "x", name: "Alice" });
+      .send({ email: "a@b.com", password: "secret123", name: "Alice" });
     spy.mockRestore();
 
     expect(res.status).toBe(500);
-    expect(res.body.error).toBe("connection lost");
+    expect(res.body.error).toBe("Internal server error");
   });
 });
 
@@ -128,6 +138,7 @@ describe("POST /api/auth/login", () => {
       password: "hashed-pw",
       name: "Alice",
       avatarUrl: null,
+      tokenVersion: 0,
     });
     bcrypt.compare.mockResolvedValue(true);
 
@@ -182,9 +193,17 @@ describe("POST /api/auth/refresh", () => {
     app = buildApp();
   });
 
-  it("issues a fresh access cookie when given a valid refresh cookie", async () => {
-    // Sign a refresh token using the in-process util so the server verifies it.
-    const refresh = (await import("../../utils/tokens.js")).signRefresh({ id: "u1" });
+  it("issues a rotated access+refresh pair when given a valid refresh cookie", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "u1",
+      email: "a@b.com",
+      name: "Alice",
+      tokenVersion: 0,
+    });
+    const refresh = (await import("../../utils/tokens.js")).signRefresh({
+      id: "u1",
+      tokenVersion: 0,
+    });
 
     const res = await request(app)
       .post("/api/auth/refresh")
@@ -195,13 +214,30 @@ describe("POST /api/auth/refresh", () => {
 
     const cookies = parseCookies(res.headers["set-cookie"]);
     expect(verifyAccess(cookies.access).sub).toBe("u1");
+    expect(verifyRefresh(cookies.refresh).sub).toBe("u1");
   });
 
-  it("returns 500 (forwarded JsonWebTokenError) when the cookie is missing/invalid", async () => {
-    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+  it("returns 401 when the cookie is missing/invalid", async () => {
     const res = await request(app).post("/api/auth/refresh");
-    spy.mockRestore();
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: "unauthenticated" });
+  });
+
+  it("returns 401 when the user's tokenVersion has been bumped", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "u1",
+      tokenVersion: 5,
+    });
+    const refresh = (await import("../../utils/tokens.js")).signRefresh({
+      id: "u1",
+      tokenVersion: 0,
+    });
+
+    const res = await request(app)
+      .post("/api/auth/refresh")
+      .set("Cookie", [`refresh=${refresh}`]);
+
+    expect(res.status).toBe(401);
   });
 });
 

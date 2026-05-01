@@ -83,7 +83,6 @@ export default function AnnouncementsPage() {
       .finally(() => mounted && setLoading(false));
 
     const s = getSocket();
-    s.emit("workspace:join", workspaceId);
     const onCreated = (a) => pushAnnouncement(a);
     const onUpdated = (a) => applyAnnouncementUpdate(a);
     const onDeleted = ({ id }) => removeAnnouncement(id);
@@ -378,7 +377,7 @@ function AnnouncementCard({
   }
 
   return (
-    <li className="bg-paper relative">
+    <li id={`a-${a.id}`} className="bg-paper relative scroll-mt-24">
       {a.pinned && (
         <span
           aria-hidden="true"

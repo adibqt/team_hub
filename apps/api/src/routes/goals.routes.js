@@ -6,6 +6,7 @@ import {
   requireGoalMember,
 } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
+import { listResponse, parsePagination } from "../utils/http.js";
 
 const r = Router();
 
@@ -43,6 +44,7 @@ r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, n
       return res.status(400).json({ error: "Owner must be a member of this workspace" });
     }
 
+    const initialStatus = status || "NOT_STARTED";
     const goal = await prisma.goal.create({
       data: {
         workspaceId: req.params.wsId,
@@ -50,7 +52,8 @@ r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, n
         description: description?.trim() || null,
         ownerId: resolvedOwnerId,
         dueDate: parsedDueDate,
-        status: status || "NOT_STARTED",
+        status: initialStatus,
+        completedAt: initialStatus === "COMPLETED" ? new Date() : null,
       },
       include: {
         owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -72,7 +75,7 @@ r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, n
 
 r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, next) => {
   try {
-    const { page = 1, take = 20 } = req.query;
+    const { take, page, skip } = parsePagination(req.query, { takeDefault: 20, takeMax: 100 });
     const goals = await prisma.goal.findMany({
       where: { workspaceId: req.params.wsId },
       include: {
@@ -80,10 +83,11 @@ r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, ne
         milestones: true,
       },
       orderBy: { createdAt: "desc" },
-      skip: (page - 1) * Number(take),
-      take: Number(take),
+      skip,
+      take,
     });
-    res.json(goals);
+    const total = await prisma.goal.count({ where: { workspaceId: req.params.wsId } });
+    res.json(listResponse(goals, { total, page, take }));
   } catch (e) { next(e); }
 });
 
@@ -144,6 +148,13 @@ r.patch("/goals/:id", requireAuth, requireGoalMember, async (req, res, next) => 
         }
       }
       data.status = status;
+      // Stamp completion the first time a goal becomes COMPLETED so
+      // analytics can aggregate by completion period rather than creation.
+      if (status === "COMPLETED" && req.goal.status !== "COMPLETED") {
+        data.completedAt = new Date();
+      } else if (status !== "COMPLETED" && req.goal.status === "COMPLETED") {
+        data.completedAt = null;
+      }
     }
     if (dueDate !== undefined) {
       if (dueDate === null || dueDate === "") {
@@ -276,7 +287,7 @@ r.get(
           author: { select: { id: true, name: true, email: true, avatarUrl: true } },
         },
       });
-      res.json(updates);
+      res.json(listResponse(updates, { total: updates.length }));
     } catch (e) { next(e); }
   }
 );

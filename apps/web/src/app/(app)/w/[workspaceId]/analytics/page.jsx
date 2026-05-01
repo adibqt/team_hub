@@ -12,6 +12,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import api from "@/lib/api";
+import { readList } from "@/lib/http";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import OnlineMembers from "@/components/OnlineMembers";
 
@@ -42,7 +43,7 @@ export default function AnalyticsPage() {
       .then(([s, c]) => {
         if (cancelled) return;
         setSummary(s.data);
-        setCompletion(c.data);
+        setCompletion(readList(c.data));
       })
       .catch((e) => {
         if (cancelled) return;
