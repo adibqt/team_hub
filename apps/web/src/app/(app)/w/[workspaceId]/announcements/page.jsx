@@ -14,10 +14,7 @@ import {
 import toast from "react-hot-toast";
 import Avatar from "@/components/ui/Avatar";
 import AnnouncementModal from "@/components/announcements/AnnouncementModal";
-import MentionInput, {
-  resolveMentions,
-  stripMentionMarkers,
-} from "@/components/MentionInput";
+import MentionInput from "@/components/MentionInput";
 import OnlineMembers from "@/components/OnlineMembers";
 import { useWorkspaceLive } from "@/lib/useWorkspaceLive";
 import { useAnnouncementsStore } from "@/stores/announcementsStore";
@@ -348,8 +345,7 @@ function AnnouncementCard({
     () => (members || []).map((m) => m.user.name).sort((x, y) => y.length - x.length),
     [members]
   );
-  const [commentBody, setCommentBody] = useState("");
-  const [commentMentions, setCommentMentions] = useState([]);
+  const [commentDraft, setCommentDraft] = useState({ body: "", mentions: [] });
   const [submittingComment, setSubmittingComment] = useState(false);
   const reactionCounts = useMemo(() => {
     const counts = new Map();
@@ -368,14 +364,12 @@ function AnnouncementCard({
 
   async function submitComment(e) {
     e?.preventDefault?.();
-    const trimmed = commentBody.trim();
+    const trimmed = commentDraft.body.trim();
     if (!trimmed || submittingComment) return;
     setSubmittingComment(true);
     try {
-      const mentions = resolveMentions(trimmed);
-      await onComment(stripMentionMarkers(trimmed), mentions.length ? mentions : commentMentions);
-      setCommentBody("");
-      setCommentMentions([]);
+      await onComment(trimmed, commentDraft.mentions);
+      setCommentDraft({ body: "", mentions: [] });
     } finally {
       setSubmittingComment(false);
     }
@@ -498,9 +492,10 @@ function AnnouncementCard({
             <form onSubmit={submitComment} className="mt-3 flex gap-2 items-start">
               <MentionInput
                 className="flex-1"
-                value={commentBody}
-                onChange={setCommentBody}
-                onMentionsChange={setCommentMentions}
+                value={commentDraft.body}
+                onValueChange={({ text, mentions }) =>
+                  setCommentDraft({ body: text, mentions })
+                }
                 onSubmit={submitComment}
                 members={members}
                 disabled={submittingComment}
@@ -509,7 +504,7 @@ function AnnouncementCard({
               />
               <button
                 type="submit"
-                disabled={submittingComment || !commentBody.trim()}
+                disabled={submittingComment || !commentDraft.body.trim()}
                 className="px-3 py-2 text-[11px] uppercase tracking-widest2 font-mono bg-ink text-paper disabled:opacity-50"
               >
                 Send
