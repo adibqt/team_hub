@@ -117,7 +117,21 @@ r.patch("/:id", requireAuth, requireMember, requireAdmin, async (req, res, next)
 
 r.delete("/:id", requireAuth, requireMember, requireAdmin, async (req, res, next) => {
   try {
-    await prisma.workspace.delete({ where: { id: req.params.id } });
+    const ws = await prisma.workspace.findUnique({ where: { id: req.params.id } });
+    if (!ws) return res.status(404).json({ error: "Not found" });
+
+    // Record the destructive action *before* the cascade. Once deleted,
+    // related audit rows will SetNull their workspaceId — we keep
+    // `workspaceName` snapshot so historical entries remain attributable.
+    await logAudit({
+      workspaceId: ws.id,
+      workspaceName: ws.name,
+      actorId: req.userId,
+      action: "workspace.delete",
+      entity: { type: "Workspace", id: ws.id },
+      before: { name: ws.name, description: ws.description, accentColor: ws.accentColor },
+    });
+    await prisma.workspace.delete({ where: { id: ws.id } });
     res.json({ ok: true });
   } catch (e) {
     next(e);

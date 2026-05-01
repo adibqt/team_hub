@@ -38,10 +38,10 @@ describe("errorHandler", () => {
     expect(res.json).toHaveBeenCalledWith({ error: "Internal server error" });
   });
 
-  it("preserves the error's own message even at 500", () => {
+  it("hides internal messages on 500 responses", () => {
     const res = makeRes();
     errorHandler({ message: "boom" }, {}, res, () => {});
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: "boom" });
+    expect(res.json).toHaveBeenCalledWith({ error: "Internal server error" });
   });
 });

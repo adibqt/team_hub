@@ -13,6 +13,7 @@ model User {
   password     String
   name         String
   avatarUrl    String?
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
   memberships  Membership[]
   ownedGoals   Goal[]   @relation("GoalOwner")
@@ -79,6 +80,7 @@ model Goal {
   ownerId      String
   dueDate      DateTime?
   status       GoalStatus @default(NOT_STARTED)
+  completedAt  DateTime?
   createdAt    DateTime @default(now())
   workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   owner        User      @relation("GoalOwner", fields: [ownerId], references: [id])
@@ -180,15 +182,16 @@ model Notification {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  workspaceId String
-  actorId     String
-  action      String
-  entityType  String
-  entityId    String
-  diff        Json?
-  createdAt   DateTime @default(now())
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  actor       User      @relation(fields: [actorId], references: [id])
+  id            String   @id @default(cuid())
+  workspaceId   String?
+  workspaceName String?
+  actorId       String
+  action        String
+  entityType    String
+  entityId      String
+  diff          Json?
+  createdAt     DateTime @default(now())
+  workspace     Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  actor         User       @relation(fields: [actorId], references: [id])
   @@index([workspaceId, createdAt])
 }

@@ -2,7 +2,8 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
 
 export const signAccess  = (u) => jwt.sign({ sub: u.id }, env.JWT_ACCESS_SECRET,  { expiresIn: "15m" });
-export const signRefresh = (u) => jwt.sign({ sub: u.id }, env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
+export const signRefresh = (u) =>
+  jwt.sign({ sub: u.id, ver: u.tokenVersion ?? 0 }, env.JWT_REFRESH_SECRET, { expiresIn: "7d" });
 export const verifyAccess  = (t) => jwt.verify(t, env.JWT_ACCESS_SECRET);
 export const verifyRefresh = (t) => jwt.verify(t, env.JWT_REFRESH_SECRET);
 

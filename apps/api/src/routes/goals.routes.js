@@ -43,6 +43,7 @@ r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, n
       return res.status(400).json({ error: "Owner must be a member of this workspace" });
     }
 
+    const initialStatus = status || "NOT_STARTED";
     const goal = await prisma.goal.create({
       data: {
         workspaceId: req.params.wsId,
@@ -50,7 +51,8 @@ r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, n
         description: description?.trim() || null,
         ownerId: resolvedOwnerId,
         dueDate: parsedDueDate,
-        status: status || "NOT_STARTED",
+        status: initialStatus,
+        completedAt: initialStatus === "COMPLETED" ? new Date() : null,
       },
       include: {
         owner: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -72,7 +74,8 @@ r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, n
 
 r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, next) => {
   try {
-    const { page = 1, take = 20 } = req.query;
+    const safeTake = Math.min(Math.max(Number(req.query.take) || 20, 1), 100);
+    const safePage = Math.max(Number(req.query.page) || 1, 1);
     const goals = await prisma.goal.findMany({
       where: { workspaceId: req.params.wsId },
       include: {
@@ -80,8 +83,8 @@ r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, ne
         milestones: true,
       },
       orderBy: { createdAt: "desc" },
-      skip: (page - 1) * Number(take),
-      take: Number(take),
+      skip: (safePage - 1) * safeTake,
+      take: safeTake,
     });
     res.json(goals);
   } catch (e) { next(e); }
@@ -144,6 +147,13 @@ r.patch("/goals/:id", requireAuth, requireGoalMember, async (req, res, next) => 
         }
       }
       data.status = status;
+      // Stamp completion the first time a goal becomes COMPLETED so
+      // analytics can aggregate by completion period rather than creation.
+      if (status === "COMPLETED" && req.goal.status !== "COMPLETED") {
+        data.completedAt = new Date();
+      } else if (status !== "COMPLETED" && req.goal.status === "COMPLETED") {
+        data.completedAt = null;
+      }
     }
     if (dueDate !== undefined) {
       if (dueDate === null || dueDate === "") {
