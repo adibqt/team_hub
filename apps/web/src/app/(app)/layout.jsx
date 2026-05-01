@@ -15,6 +15,7 @@ import {
   Settings,
   ScrollText,
   Compass,
+  BarChart3,
 } from "lucide-react";
 import clsx from "clsx";
 import toast from "react-hot-toast";
@@ -39,8 +40,9 @@ const WS_NAV = [
   { sub: "/items",        label: "Action items",  icon: ListChecks,  n: "03" },
   { sub: "/announcements",label: "Announcements", icon: Megaphone,   n: "04" },
   { sub: "/members",      label: "Members",       icon: Users,       n: "05" },
-  { sub: "/audit",        label: "Audit",         icon: ScrollText,  n: "06" },
-  { sub: "/settings",     label: "Settings",      icon: Settings,    n: "07" },
+  { sub: "/analytics",    label: "Analytics",     icon: BarChart3,   n: "06" },
+  { sub: "/audit",        label: "Audit",         icon: ScrollText,  n: "07" },
+  { sub: "/settings",     label: "Settings",      icon: Settings,    n: "08" },
 ];
 
 export default function AppLayout({ children }) {

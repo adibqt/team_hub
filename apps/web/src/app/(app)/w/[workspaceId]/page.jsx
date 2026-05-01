@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Target, ListChecks, Megaphone, Users, ScrollText, Settings, UserPlus } from "lucide-react";
+import { ArrowRight, Target, ListChecks, Megaphone, Users, ScrollText, Settings, UserPlus, BarChart3 } from "lucide-react";
 import { useGoalsStore } from "@/stores/goalsStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { getSocket } from "@/lib/socket";
@@ -131,9 +131,10 @@ export default function WorkspaceHomePage() {
           <NavTile n="02" href={`/w/${workspaceId}/items`}         icon={ListChecks} title="Action items"  body="Drag-and-drop kanban for daily work." accent={accent} />
           <NavTile n="03" href={`/w/${workspaceId}/announcements`} icon={Megaphone}  title="Announcements" body="Pinned notes, reactions, and mentions." accent={accent} />
           <NavTile n="04" href={`/w/${workspaceId}/members`}       icon={Users}      title="Members"       body="Invitations, roles, and roster admin." accent={accent} />
-          <NavTile n="05" href={`/w/${workspaceId}/audit`}         icon={ScrollText} title="Audit log"     body="Immutable history of every change." accent={accent} />
+          <NavTile n="05" href={`/w/${workspaceId}/analytics`}     icon={BarChart3}  title="Analytics"     body="Stats, charts, and a CSV export." accent={accent} />
+          <NavTile n="06" href={`/w/${workspaceId}/audit`}         icon={ScrollText} title="Audit log"     body="Immutable history of every change." accent={accent} />
           {isAdmin && (
-            <NavTile n="06" href={`/w/${workspaceId}/settings`}    icon={Settings}   title="Settings"      body="Name, description, accent, danger zone." accent={accent} />
+            <NavTile n="07" href={`/w/${workspaceId}/settings`}    icon={Settings}   title="Settings"      body="Name, description, accent, danger zone." accent={accent} />
           )}
         </ul>
       </section>

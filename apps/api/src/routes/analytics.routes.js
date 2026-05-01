@@ -1,26 +1,31 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, requireMember } from "../middleware/auth.js";
 
 const r = Router();
 
-r.get("/:id/analytics/summary", requireAuth, async (req, res, next) => {
+r.get("/:id/analytics/summary", requireAuth, requireMember, async (req, res, next) => {
   try {
     const wsId = req.params.id;
     const now = new Date();
     const weekAgo = new Date(now - 7 * 24 * 3600 * 1000);
 
-    const [totalGoals, completedThisWeek, overdueCount] = await Promise.all([
+    const [totalGoals, itemsCompletedThisWeek, overdueGoals, overdueItems] = await Promise.all([
       prisma.goal.count({ where: { workspaceId: wsId } }),
-      prisma.goal.count({ where: { workspaceId: wsId, status: "COMPLETED", createdAt: { gte: weekAgo } } }),
+      prisma.actionItem.count({ where: { workspaceId: wsId, status: "DONE", createdAt: { gte: weekAgo } } }),
       prisma.goal.count({ where: { workspaceId: wsId, dueDate: { lt: now }, status: { not: "COMPLETED" } } }),
+      prisma.actionItem.count({ where: { workspaceId: wsId, dueDate: { lt: now }, status: { not: "DONE" } } }),
     ]);
 
-    res.json({ totalGoals, completedThisWeek, overdueCount });
+    res.json({
+      totalGoals,
+      itemsCompletedThisWeek,
+      overdueCount: overdueGoals + overdueItems,
+    });
   } catch (e) { next(e); }
 });
 
-r.get("/:id/analytics/completion", requireAuth, async (req, res, next) => {
+r.get("/:id/analytics/completion", requireAuth, requireMember, async (req, res, next) => {
   try {
     const wsId = req.params.id;
     const weeks = [];
@@ -34,23 +39,55 @@ r.get("/:id/analytics/completion", requireAuth, async (req, res, next) => {
       const count = await prisma.goal.count({
         where: { workspaceId: wsId, status: "COMPLETED", createdAt: { gte: start, lt: end } },
       });
-      weeks.push({ week: `${year}-W${String(week).padStart(2, "0")}`, completed: count });
+      weeks.push({
+        week: `${year}-W${String(week).padStart(2, "0")}`,
+        weekStart: start.toISOString(),
+        completed: count,
+      });
     }
     res.json(weeks);
   } catch (e) { next(e); }
 });
 
-r.get("/:id/export.csv", requireAuth, async (req, res, next) => {
+function csvEscape(v) {
+  if (v == null) return "";
+  const s = String(v);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+r.get("/:id/export.csv", requireAuth, requireMember, async (req, res, next) => {
   try {
     const [goals, items] = await Promise.all([
       prisma.goal.findMany({ where: { workspaceId: req.params.id } }),
       prisma.actionItem.findMany({ where: { workspaceId: req.params.id } }),
     ]);
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename=workspace-${req.params.id}.csv`);
-    res.write("type,id,title,status,createdAt\n");
-    goals.forEach((g) => res.write(`goal,${g.id},${g.title},${g.status},${g.createdAt.toISOString()}\n`));
-    items.forEach((i) => res.write(`item,${i.id},${i.title},${i.status},${i.createdAt.toISOString()}\n`));
+    res.write("type,id,title,status,dueDate,createdAt\n");
+    goals.forEach((g) =>
+      res.write(
+        [
+          "goal",
+          csvEscape(g.id),
+          csvEscape(g.title),
+          csvEscape(g.status),
+          csvEscape(g.dueDate ? g.dueDate.toISOString() : ""),
+          csvEscape(g.createdAt.toISOString()),
+        ].join(",") + "\n"
+      )
+    );
+    items.forEach((i) =>
+      res.write(
+        [
+          "item",
+          csvEscape(i.id),
+          csvEscape(i.title),
+          csvEscape(i.status),
+          csvEscape(i.dueDate ? i.dueDate.toISOString() : ""),
+          csvEscape(i.createdAt.toISOString()),
+        ].join(",") + "\n"
+      )
+    );
     res.end();
   } catch (e) { next(e); }
 });

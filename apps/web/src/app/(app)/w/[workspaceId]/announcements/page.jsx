@@ -195,15 +195,17 @@ export default function AnnouncementsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
-            <OnlineMembers workspaceId={workspaceId} />
-            <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45 tabular-nums">
-              {loading
-                ? "loading…"
-                : `${announcements.length} on file${
-                    pinned.length ? ` · ${pinned.length} pinned` : ""
-                  }`}
-            </p>
+          <div className="flex flex-col items-start lg:items-end gap-3">
+            <div className="flex items-center gap-4 flex-wrap lg:justify-end">
+              <OnlineMembers workspaceId={workspaceId} />
+              <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45 tabular-nums">
+                {loading
+                  ? "loading…"
+                  : `${announcements.length} on file${
+                      pinned.length ? ` · ${pinned.length} pinned` : ""
+                    }`}
+              </p>
+            </div>
             {isAdmin && (
               <button
                 type="button"
