@@ -7,6 +7,7 @@ import {
   requireAdmin,
 } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
+import { sendMentionEmail } from "../services/mailer.js";
 
 const r = Router();
 
@@ -404,6 +405,23 @@ r.post("/announcements/:id/comments", requireAuth, async (req, res, next) => {
     const targets = [...new Set(comment.mentions || [])].filter(
       (id) => id && id !== req.userId
     );
+    const [workspace, recipients] = targets.length
+      ? await Promise.all([
+          prisma.workspace.findUnique({
+            where: { id: announcement.workspaceId },
+            select: { id: true, name: true, accentColor: true },
+          }),
+          prisma.user.findMany({
+            where: { id: { in: targets } },
+            select: { id: true, email: true, name: true },
+          }),
+        ])
+      : [null, []];
+    const recipientsById = new Map(recipients.map((u) => [u.id, u]));
+    const announcementUrl = `${process.env.CLIENT_URL || "http://localhost:3000"}/w/${
+      announcement.workspaceId
+    }/announcements#a-${announcement.id}`;
+
     for (const userId of targets) {
       const note = await prisma.notification.create({
         data: {
@@ -421,6 +439,20 @@ r.post("/announcements/:id/comments", requireAuth, async (req, res, next) => {
         },
       });
       io.to(`user:${userId}`).emit("notification:new", note);
+
+      const recipient = recipientsById.get(userId);
+      if (recipient?.email) {
+        await sendMentionEmail({
+          to: recipient.email,
+          recipientName: recipient.name,
+          actorName: comment.author?.name || "Someone",
+          workspaceName: workspace?.name || "your workspace",
+          workspaceAccent: workspace?.accentColor || "#2563EB",
+          announcementTitle: announcement.title,
+          commentPreview: trimmed.length > 140 ? trimmed.slice(0, 137) + "..." : trimmed,
+          announcementUrl,
+        });
+      }
     }
 
     const updated = await loadAnnouncementForFeed(req.params.id);

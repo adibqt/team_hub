@@ -190,4 +190,138 @@ export async function sendInviteEmail({
   }
 }
 
-export const mailer = { isMailEnabled, sendInviteEmail };
+/**
+ * Send a mention notification email.
+ *
+ * Resolves to `{ sent: boolean, skipped?: string, messageId?: string }`.
+ * Never throws — in-app notifications are the source of truth.
+ */
+export async function sendMentionEmail({
+  to,
+  recipientName,
+  actorName,
+  workspaceName,
+  workspaceAccent = "#2563EB",
+  announcementTitle,
+  commentPreview,
+  announcementUrl,
+}) {
+  if (!isMailEnabled()) {
+    console.warn(
+      `[mailer] SMTP not configured — skipping mention email to ${to}. ` +
+        `Set SMTP_HOST/SMTP_USER/SMTP_PASS in apps/api/.env to enable.`
+    );
+    return { sent: false, skipped: "smtp-not-configured" };
+  }
+
+  const t = getTransporter();
+  if (verifyPromise) await verifyPromise.catch(() => {});
+
+  const safeRecipient = escapeHtml(recipientName || "there");
+  const safeActor = escapeHtml(actorName || "Someone");
+  const safeWorkspace = escapeHtml(workspaceName || "your workspace");
+  const safeAnnouncement = escapeHtml(announcementTitle || "an announcement");
+  const safePreview = escapeHtml(commentPreview || "");
+  const accent = /^#[0-9A-Fa-f]{6}$/.test(workspaceAccent) ? workspaceAccent : "#2563EB";
+
+  const subject = `${actorName || "Someone"} mentioned you in ${announcementTitle || "an announcement"}`;
+
+  const text = [
+    `Hi ${recipientName || "there"},`,
+    "",
+    `${actorName || "Someone"} mentioned you in "${announcementTitle || "an announcement"}"`,
+    `inside ${workspaceName || "your workspace"} on Team Hub.`,
+    "",
+    safePreview ? `Comment preview: "${commentPreview}"` : null,
+    "",
+    "Open the announcement:",
+    announcementUrl,
+    "",
+    "You can manage your notifications inside Team Hub.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>You were mentioned on Team Hub</title>
+  </head>
+  <body style="margin:0;padding:0;background:#F5F1EA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1A1814;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F5F1EA;padding:48px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#FFFDF8;border:1px solid rgba(26,24,20,0.12);">
+            <tr>
+              <td style="padding:32px 40px 0;">
+                <p style="margin:0;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(26,24,20,0.55);">
+                  <span style="display:inline-block;width:24px;height:1px;background:${accent};vertical-align:middle;margin-right:10px;"></span>
+                  Team Hub · Mention
+                </p>
+                <h1 style="margin:24px 0 0;font-size:30px;line-height:1.1;letter-spacing:-0.02em;font-weight:300;color:#1A1814;">
+                  You were mentioned<span style="color:${accent};">.</span>
+                </h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 40px 8px;">
+                <p style="margin:0;font-size:15px;line-height:1.6;color:rgba(26,24,20,0.78);">
+                  Hi <strong style="color:#1A1814;font-weight:500;">${safeRecipient}</strong> — 
+                  <strong style="color:#1A1814;font-weight:500;">${safeActor}</strong> mentioned you in
+                  <em style="font-style:italic;color:#1A1814;"> ${safeAnnouncement}</em>
+                  in <span style="color:${accent};">${safeWorkspace}</span>.
+                </p>
+              </td>
+            </tr>
+            ${
+              safePreview
+                ? `<tr>
+              <td style="padding:16px 40px 4px;">
+                <p style="margin:0;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(26,24,20,0.45);">
+                  Comment preview
+                </p>
+                <p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:rgba(26,24,20,0.72);">"${safePreview}"</p>
+              </td>
+            </tr>`
+                : ""
+            }
+            <tr>
+              <td style="padding:28px 40px 8px;" align="left">
+                <a href="${announcementUrl}"
+                   style="display:inline-block;background:#1A1814;color:#FFFDF8;text-decoration:none;padding:14px 28px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;">
+                  View announcement →
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 40px 36px;">
+                <p style="margin:0;font-size:12px;line-height:1.55;color:rgba(26,24,20,0.4);">
+                  If this wasn't expected, you can review your mentions and notifications after signing in to Team Hub.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
+  try {
+    const info = await t.sendMail({
+      from: fromAddress(),
+      to,
+      subject,
+      text,
+      html,
+    });
+    return { sent: true, messageId: info.messageId };
+  } catch (err) {
+    console.error(`[mailer] Failed to send mention email to ${to}:`, err.message);
+    return { sent: false, error: err.message };
+  }
+}
+
+export const mailer = { isMailEnabled, sendInviteEmail, sendMentionEmail };
