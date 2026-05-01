@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" fill="#F5F1E8"/>
+  <text
+    x="16"
+    y="22"
+    text-anchor="middle"
+    font-family="'Fraunces','Times New Roman',Georgia,serif"
+    font-style="italic"
+    font-weight="500"
+    font-size="20"
+    fill="#0F0F12"
+  >T<tspan fill="#D34F1F">·</tspan>H</text>
+</svg>

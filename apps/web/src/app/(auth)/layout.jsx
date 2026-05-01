@@ -64,7 +64,7 @@ export default function AuthLayout({ children }) {
       {/* ============================================================
           EDITORIAL PANEL (left)
          ============================================================ */}
-      <aside className="relative z-10 lg:col-span-7 px-6 sm:px-10 lg:px-14 py-10 lg:py-14 lg:border-r lg:border-ink/15 flex flex-col">
+      <aside className="order-2 lg:order-none relative z-10 lg:col-span-7 px-6 sm:px-10 lg:px-14 py-10 lg:py-14 lg:border-r lg:border-ink/15 flex flex-col">
         {/* tag */}
         <div className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55 flex items-center gap-3 animate-fade-in">
           <span aria-hidden="true" className="inline-block h-px w-8 bg-ink/40" />
@@ -132,7 +132,7 @@ export default function AuthLayout({ children }) {
       {/* ============================================================
           FORM PANEL (right)
          ============================================================ */}
-      <main className="relative z-10 lg:col-span-5 px-6 sm:px-10 lg:px-12 py-10 lg:py-14 flex flex-col items-center">
+      <main className="order-1 lg:order-none relative z-10 lg:col-span-5 px-6 sm:px-10 lg:px-12 py-10 lg:py-14 flex flex-col items-center">
         <div className="w-full max-w-md flex-1 flex flex-col">
           {children}
         </div>
