@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(npx next *)",
-      "Bash(a-\" /f/team_hub/apps/web/src/app/\\\\\\(app\\\\\\)/w/\\\\[workspaceId\\\\]/announcements/page.jsx)",
-      "Bash(grep -n \"id=\\\\\"a-\\\\|id={`a-\" /f/team_hub/apps/web/src/app/\\\\\\(app\\\\\\)/w/\\\\[workspaceId\\\\]/announcements/page.jsx)"
-    ]
-  }
-}
