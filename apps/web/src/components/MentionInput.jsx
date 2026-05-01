@@ -3,23 +3,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import Avatar from "@/components/ui/Avatar";
 
+const MENTION_MARKER = "\u2063";
+
 /**
- * Plain-text input with `@`-mention autocomplete. The body stays as
- * `Hello @Adib` (literal text) while a parallel `mentions` array of
- * resolved user IDs is reported to the parent on every change.
+ * Plain-text input with `@`-mention autocomplete.
  *
- * Design choices:
- * - We resolve mentions by matching the trailing token after each `@`
- *   against the current member roster's display names. This keeps the
- *   UI predictable: if a name no longer matches a member (renamed,
- *   removed) we drop the mention silently rather than guessing.
- * - We render a textarea, not a contenteditable, to avoid the long tail
- *   of selection bugs. The dropdown is positioned below the field —
- *   good enough for a single-line comment composer.
+ * We encode selected mentions with invisible ID markers in the textarea
+ * value (`@Name⁣<id>⁣`) so mention identity is stable even if multiple
+ * members share the same display name.
  */
 export default function MentionInput({
   value,
   onChange,
+  onMentionsChange,
   onSubmit,
   members = [],
   placeholder = "Write a comment…",
@@ -54,6 +50,7 @@ export default function MentionInput({
   function handleChange(e) {
     const next = e.target.value;
     onChange(next);
+    onMentionsChange?.(resolveMentions(next));
     refreshMentionState(next, e.target.selectionStart);
   }
 
@@ -92,9 +89,10 @@ export default function MentionInput({
     const caret = ta?.selectionEnd ?? value.length;
     const before = value.slice(0, anchor);
     const after = value.slice(caret);
-    const inserted = `@${user.name} `;
+    const inserted = `@${user.name}${mentionMarker(user.id)} `;
     const next = before + inserted + after;
     onChange(next);
+    onMentionsChange?.(resolveMentions(next));
     setOpen(false);
     setAnchor(null);
     requestAnimationFrame(() => {
@@ -128,6 +126,7 @@ export default function MentionInput({
         placeholder={placeholder}
         disabled={disabled}
         maxLength={maxLength}
+        aria-label="Comment input with mentions"
         className="w-full resize-none border border-ink/20 bg-paper px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-ember/40"
       />
       {open && filtered.length > 0 && (
@@ -173,18 +172,25 @@ export default function MentionInput({
 }
 
 /**
- * Resolve the `mentions` array from the current text + member roster.
- * Returns user IDs whose `@<name>` token appears in the body, with the
- * `@` preceded by whitespace or start-of-string so we don't catch URLs.
+ * Resolve mention IDs from invisible mention markers in text.
  */
-export function resolveMentions(text, members = []) {
-  if (!text || !members.length) return [];
+export function resolveMentions(text) {
+  if (!text) return [];
   const ids = new Set();
-  for (const m of members) {
-    // Escape regex specials in the member name
-    const safe = m.user.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(`(^|\\s)@${safe}\\b`, "i");
-    if (re.test(text)) ids.add(m.userId);
+  const re = new RegExp(`${MENTION_MARKER}([^${MENTION_MARKER}\\s]+)${MENTION_MARKER}`, "g");
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (m[1]) ids.add(m[1]);
   }
   return [...ids];
+}
+
+export function stripMentionMarkers(text = "") {
+  if (!text) return "";
+  const re = new RegExp(`${MENTION_MARKER}([^${MENTION_MARKER}\\s]+)${MENTION_MARKER}`, "g");
+  return text.replace(re, "");
+}
+
+function mentionMarker(userId) {
+  return `${MENTION_MARKER}${String(userId)}${MENTION_MARKER}`;
 }

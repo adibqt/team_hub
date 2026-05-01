@@ -14,7 +14,10 @@ import {
 import toast from "react-hot-toast";
 import Avatar from "@/components/ui/Avatar";
 import AnnouncementModal from "@/components/announcements/AnnouncementModal";
-import MentionInput, { resolveMentions } from "@/components/MentionInput";
+import MentionInput, {
+  resolveMentions,
+  stripMentionMarkers,
+} from "@/components/MentionInput";
 import OnlineMembers from "@/components/OnlineMembers";
 import { useWorkspaceLive } from "@/lib/useWorkspaceLive";
 import { useAnnouncementsStore } from "@/stores/announcementsStore";
@@ -346,6 +349,7 @@ function AnnouncementCard({
     [members]
   );
   const [commentBody, setCommentBody] = useState("");
+  const [commentMentions, setCommentMentions] = useState([]);
   const [submittingComment, setSubmittingComment] = useState(false);
   const reactionCounts = useMemo(() => {
     const counts = new Map();
@@ -368,9 +372,10 @@ function AnnouncementCard({
     if (!trimmed || submittingComment) return;
     setSubmittingComment(true);
     try {
-      const mentions = resolveMentions(trimmed, members);
-      await onComment(trimmed, mentions);
+      const mentions = resolveMentions(trimmed);
+      await onComment(stripMentionMarkers(trimmed), mentions.length ? mentions : commentMentions);
       setCommentBody("");
+      setCommentMentions([]);
     } finally {
       setSubmittingComment(false);
     }
@@ -495,6 +500,7 @@ function AnnouncementCard({
                 className="flex-1"
                 value={commentBody}
                 onChange={setCommentBody}
+                onMentionsChange={setCommentMentions}
                 onSubmit={submitComment}
                 members={members}
                 disabled={submittingComment}
