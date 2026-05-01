@@ -1,20 +1,27 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import api from "@/lib/api";
+
+const PAGE_SIZE = 50;
 
 export default function AuditPage() {
   const { workspaceId } = useParams();
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
-  const [filters, setFilters] = useState({ actorId: "", action: "", from: "", to: "" });
+  const [filters, setFilters] = useState({ actor: "", action: "", from: "", to: "" });
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    const params = new URLSearchParams({ page, take: 50, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) });
+    const params = new URLSearchParams({ page, take: PAGE_SIZE, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)) });
     api.get(`/api/workspaces/${workspaceId}/audit?${params}`)
       .then(({ data }) => { setRows(data.rows); setTotal(data.total); });
   }, [workspaceId, page, filters]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const startIdx = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endIdx = Math.min(page * PAGE_SIZE, total);
 
   return (
     <div className="p-8">
@@ -25,13 +32,15 @@ export default function AuditPage() {
           Download CSV
         </a>
       </div>
-      <div className="flex gap-3 mb-6">
+      <div className="flex gap-3 mb-6 flex-wrap">
+        <input className="border rounded px-3 py-2 text-sm" placeholder="Filter by actor name or email…"
+          value={filters.actor} onChange={(e) => { setPage(1); setFilters({ ...filters, actor: e.target.value }); }} />
         <input className="border rounded px-3 py-2 text-sm" placeholder="Filter action…"
-          value={filters.action} onChange={(e) => setFilters({ ...filters, action: e.target.value })} />
+          value={filters.action} onChange={(e) => { setPage(1); setFilters({ ...filters, action: e.target.value }); }} />
         <input className="border rounded px-3 py-2 text-sm" type="date" placeholder="From"
-          value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} />
+          value={filters.from} onChange={(e) => { setPage(1); setFilters({ ...filters, from: e.target.value }); }} />
         <input className="border rounded px-3 py-2 text-sm" type="date" placeholder="To"
-          value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} />
+          value={filters.to} onChange={(e) => { setPage(1); setFilters({ ...filters, to: e.target.value }); }} />
       </div>
       <div className="bg-white rounded-xl shadow overflow-auto">
         <table className="w-full text-sm">
@@ -58,7 +67,34 @@ export default function AuditPage() {
           </tbody>
         </table>
       </div>
-      <p className="text-sm text-gray-400 mt-3">{total} total entries</p>
+      <div className="mt-3 flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-gray-400">
+          {total === 0 ? "No entries" : `Showing ${startIdx}–${endIdx} of ${total}`}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
+            Prev
+          </button>
+          <span className="text-sm text-gray-500 tabular-nums px-2">
+            Page {page} / {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border rounded disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50"
+          >
+            Next
+            <ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

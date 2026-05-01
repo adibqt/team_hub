@@ -6,11 +6,19 @@ const r = Router();
 
 r.get("/:id/audit", requireAuth, async (req, res, next) => {
   try {
-    const { actorId, action, from, to, page = 1, take = 50 } = req.query;
+    const { actorId, actor, action, from, to, page = 1, take = 50 } = req.query;
     const where = {
       workspaceId: req.params.id,
       ...(actorId && { actorId }),
-      ...(action  && { action: { contains: action } }),
+      ...(actor && {
+        actor: {
+          OR: [
+            { name:  { contains: actor, mode: "insensitive" } },
+            { email: { contains: actor, mode: "insensitive" } },
+          ],
+        },
+      }),
+      ...(action  && { action: { contains: action, mode: "insensitive" } }),
       ...(from || to ? { createdAt: { gte: from && new Date(from), lte: to && new Date(to) } } : {}),
     };
     const [rows, total] = await Promise.all([

@@ -136,6 +136,8 @@ export default function WorkspaceHomePage() {
           {isAdmin && (
             <NavTile n="07" href={`/w/${workspaceId}/settings`}    icon={Settings}   title="Settings"      body="Name, description, accent, danger zone." accent={accent} />
           )}
+          {isAdmin && <li aria-hidden="true" className="hidden md:block bg-paper" />}
+          {isAdmin && <li aria-hidden="true" className="hidden xl:block bg-paper" />}
         </ul>
       </section>
 
