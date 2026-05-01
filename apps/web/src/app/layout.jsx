@@ -4,6 +4,8 @@ import "./globals.css";
 import ThemeScript from "@/components/ThemeScript";
 import ThemeProvider from "@/components/ThemeProvider";
 
+export const dynamic = "force-dynamic";
+
 const fraunces = Fraunces({
   subsets: ["latin"],
   display: "swap",
