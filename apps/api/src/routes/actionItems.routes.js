@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 import { requireAuth, requireMember } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
+import { listResponse, parsePagination } from "../utils/http.js";
 
 const r = Router();
 
@@ -104,12 +105,16 @@ r.post("/workspaces/:wsId/items", requireAuth, requireMember, async (req, res, n
 /* ─────────────────────────────────────────────  LIST  ───────────────────────────────────────────── */
 r.get("/workspaces/:wsId/items", requireAuth, requireMember, async (req, res, next) => {
   try {
+    const { take, page, skip } = parsePagination(req.query, { takeDefault: 50, takeMax: 100 });
     const items = await prisma.actionItem.findMany({
       where: { workspaceId: req.params.wsId },
       include: ITEM_INCLUDE,
       orderBy: { createdAt: "desc" },
+      skip,
+      take,
     });
-    res.json(items);
+    const total = await prisma.actionItem.count({ where: { workspaceId: req.params.wsId } });
+    res.json(listResponse(items, { total, page, take }));
   } catch (e) { next(e); }
 });
 

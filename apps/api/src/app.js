@@ -11,18 +11,35 @@ import { errorHandler } from "./middleware/error.js";
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+
+const allowedOrigins = new Set(
+  String(env.CLIENT_URL || "http://localhost:3000")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+);
+
+app.use(
+  cors({
+    credentials: true,
+    origin: (origin, callback) => {
+      // Allow same-origin/non-browser requests (no Origin header).
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      const err = new Error("CORS origin not allowed");
+      err.status = 403;
+      return callback(err);
+    },
+  })
+);
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
 app.use(morgan("dev"));
 
 app.get("/health", (_, res) => res.json({ ok: true }));
 app.get("/api/docs.json", (_, res) => res.json(swaggerSpec));
-app.use("/api/docs", (req, res, next) => {
-  // Swagger UI uses inline assets, so remove CSP only for this route.
-  res.removeHeader("Content-Security-Policy");
-  next();
-});
+// Swagger UI needs inline scripts/styles; disable CSP on this route only.
+app.use("/api/docs", helmet({ contentSecurityPolicy: false }));
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api", routes);
 app.use(errorHandler);

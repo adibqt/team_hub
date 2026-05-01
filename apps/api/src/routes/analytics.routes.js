@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma.js";
 import { requireAuth, requireMember } from "../middleware/auth.js";
+import { listResponse } from "../utils/http.js";
 
 const r = Router();
 
@@ -8,7 +9,7 @@ r.get("/:id/analytics/summary", requireAuth, requireMember, async (req, res, nex
   try {
     const wsId = req.params.id;
     const now = new Date();
-    const weekAgo = new Date(now - 7 * 24 * 3600 * 1000);
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
 
     const [totalGoals, itemsCompletedThisWeek, overdueGoals, overdueItems] = await Promise.all([
       prisma.goal.count({ where: { workspaceId: wsId } }),
@@ -58,7 +59,7 @@ r.get("/:id/analytics/completion", requireAuth, requireMember, async (req, res, 
         completed: count,
       });
     }
-    res.json(weeks);
+    res.json(listResponse(weeks, { total: weeks.length }));
   } catch (e) { next(e); }
 });
 

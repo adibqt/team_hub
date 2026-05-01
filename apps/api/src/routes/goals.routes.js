@@ -6,6 +6,7 @@ import {
   requireGoalMember,
 } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
+import { listResponse, parsePagination } from "../utils/http.js";
 
 const r = Router();
 
@@ -74,8 +75,7 @@ r.post("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, n
 
 r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, next) => {
   try {
-    const safeTake = Math.min(Math.max(Number(req.query.take) || 20, 1), 100);
-    const safePage = Math.max(Number(req.query.page) || 1, 1);
+    const { take, page, skip } = parsePagination(req.query, { takeDefault: 20, takeMax: 100 });
     const goals = await prisma.goal.findMany({
       where: { workspaceId: req.params.wsId },
       include: {
@@ -83,10 +83,11 @@ r.get("/workspaces/:wsId/goals", requireAuth, requireMember, async (req, res, ne
         milestones: true,
       },
       orderBy: { createdAt: "desc" },
-      skip: (safePage - 1) * safeTake,
-      take: safeTake,
+      skip,
+      take,
     });
-    res.json(goals);
+    const total = await prisma.goal.count({ where: { workspaceId: req.params.wsId } });
+    res.json(listResponse(goals, { total, page, take }));
   } catch (e) { next(e); }
 });
 
@@ -286,7 +287,7 @@ r.get(
           author: { select: { id: true, name: true, email: true, avatarUrl: true } },
         },
       });
-      res.json(updates);
+      res.json(listResponse(updates, { total: updates.length }));
     } catch (e) { next(e); }
   }
 );

@@ -52,7 +52,10 @@ export default function RegisterPage() {
   const tooWeak = form.password.length > 0 && getStrength(form.password) < 1;
 
   useEffect(() => {
-    setEdition(getEditionLabel());
+    const tickEdition = () => setEdition(getEditionLabel());
+    tickEdition();
+    const id = window.setInterval(tickEdition, 30_000);
+    return () => window.clearInterval(id);
   }, []);
 
   async function handleSubmit(e) {

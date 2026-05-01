@@ -96,7 +96,6 @@ export default function GoalDetailPage() {
       .finally(() => mounted && setLoadingFeed(false));
 
     const s = getSocket();
-    s.emit("workspace:join", workspaceId);
     const onUpdatePosted = (u) => {
       if (u.goalId === goalId) pushUpdate(u);
     };

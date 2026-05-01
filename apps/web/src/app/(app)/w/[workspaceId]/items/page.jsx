@@ -86,7 +86,6 @@ export default function ItemsPage() {
     ]).finally(() => mounted && setLoading(false));
 
     const s = getSocket();
-    s.emit("workspace:join", workspaceId);
     const onCreated = (i) => pushItem(i);
     const onUpdated = (i) => applyItemUpdate(i);
     const onDeleted = (p) => removeItemFromSocket(p);

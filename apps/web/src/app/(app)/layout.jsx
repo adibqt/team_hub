@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter, usePathname, useParams } from "next/navigation";
+import { useRouter, usePathname, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -50,16 +50,23 @@ const WS_NAV = [
 export default function AppLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams?.toString() || "";
   const params = useParams();
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const workspaces = useWorkspaceStore((s) => s.workspaces);
   const load = useWorkspaceStore((s) => s.load);
+  const hydrateActiveWorkspace = useWorkspaceStore((s) => s.hydrateActiveWorkspace);
   const loadNotifications = useNotificationsStore((s) => s.load);
   const pushNotification = useNotificationsStore((s) => s.pushNotification);
   const [bootChecked, setBootChecked] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    hydrateActiveWorkspace();
+  }, [hydrateActiveWorkspace]);
 
   useEffect(() => {
     api
@@ -69,9 +76,12 @@ export default function AppLayout({ children }) {
         load().catch(() => {});
         loadNotifications().catch(() => {});
       })
-      .catch(() => router.replace("/login"))
+      .catch(() => {
+        const next = `${pathname || "/"}${search ? `?${search}` : ""}`;
+        router.replace(`/login?next=${encodeURIComponent(next)}`);
+      })
       .finally(() => setBootChecked(true));
-  }, [router, setUser, load, loadNotifications]);
+  }, [router, pathname, search, setUser, load, loadNotifications]);
 
   // Global socket subscription for notifications, scoped to the user's
   // personal room (the API joins us into it on connect). One handler for

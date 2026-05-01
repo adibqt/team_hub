@@ -53,7 +53,10 @@ export default function LoginPage() {
   const [edition, setEdition] = useState("Morning edition");
 
   useEffect(() => {
-    setEdition(getEditionLabel());
+    const tickEdition = () => setEdition(getEditionLabel());
+    tickEdition();
+    const id = window.setInterval(tickEdition, 30_000);
+    return () => window.clearInterval(id);
   }, []);
 
   async function handleSubmit(e) {

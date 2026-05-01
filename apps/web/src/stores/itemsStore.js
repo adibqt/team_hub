@@ -1,14 +1,16 @@
 import { create } from "zustand";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
+import { readList } from "@/lib/http";
 
 export const useItemsStore = create((set, get) => ({
   items: [],
 
   load: async (wsId) => {
     const { data } = await api.get(`/api/workspaces/${wsId}/items`);
-    set({ items: data });
-    return data;
+    const items = readList(data);
+    set({ items });
+    return items;
   },
 
   createItem: async (wsId, draft) => {

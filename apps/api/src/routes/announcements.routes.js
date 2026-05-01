@@ -8,6 +8,7 @@ import {
 } from "../middleware/auth.js";
 import { logAudit } from "../services/audit.js";
 import { sendMentionEmail } from "../services/mailer.js";
+import { listResponse, parsePagination } from "../utils/http.js";
 
 const r = Router();
 
@@ -211,8 +212,7 @@ r.get(
       // Cap page size so a workspace with thousands of announcements
       // can't blow up memory in a single request. Existing clients that
       // don't pass a page get the most recent page only.
-      const safeTake = Math.min(Math.max(Number(req.query.take) || 50, 1), 100);
-      const safePage = Math.max(Number(req.query.page) || 1, 1);
+      const { take, page, skip } = parsePagination(req.query, { takeDefault: 50, takeMax: 100 });
       const announcements = await prisma.announcement.findMany({
         where: { workspaceId: req.params.wsId },
         include: {
@@ -225,11 +225,12 @@ r.get(
           reactions: true,
         },
         orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
-        skip: (safePage - 1) * safeTake,
-        take: safeTake,
+        skip,
+        take,
       });
       const hydrated = await attachAuthors(announcements);
-      res.json(hydrated);
+      const total = await prisma.announcement.count({ where: { workspaceId: req.params.wsId } });
+      res.json(listResponse(hydrated, { total, page, take }));
     } catch (e) {
       next(e);
     }

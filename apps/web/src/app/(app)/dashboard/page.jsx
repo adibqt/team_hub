@@ -20,7 +20,8 @@ function firstName(full) {
 
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
-  const { workspaces, load } = useWorkspaceStore();
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const load = useWorkspaceStore((s) => s.load);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
 
