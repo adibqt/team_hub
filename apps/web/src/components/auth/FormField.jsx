@@ -8,6 +8,8 @@ import clsx from "clsx";
  * - Mono uppercase micro-label paired with a numeric prefix.
  * - Hairline border on the bottom only; whole field shifts on focus.
  * - Ember accent on focus, ink on hover, ember-700 on error.
+ * - Dark-mode only: a soft ember underglow + icon halo while focused
+ *   (driven by `.field-shell` / `.field-icon` rules in globals.css).
  */
 const FormField = forwardRef(function FormField(
   {
@@ -18,6 +20,7 @@ const FormField = forwardRef(function FormField(
     hint,
     className,
     index, // optional "01", "02"… numeric prefix
+    trailing, // optional small element to the right of the hint slot
     ...props
   },
   ref
@@ -43,19 +46,23 @@ const FormField = forwardRef(function FormField(
           )}
           <span>{label}</span>
         </label>
-        {hint && !error && (
-          <span
-            id={hintId}
-            className="hidden sm:inline font-mono text-[10px] tracking-wider text-ink/40 lowercase"
-          >
-            {hint}
-          </span>
+        {trailing ? (
+          <span className="shrink-0">{trailing}</span>
+        ) : (
+          hint && !error && (
+            <span
+              id={hintId}
+              className="hidden sm:inline font-mono text-[10px] tracking-wider text-ink/40 lowercase"
+            >
+              {hint}
+            </span>
+          )
         )}
       </div>
 
       <div
         className={clsx(
-          "relative flex items-center border-b transition-colors duration-200",
+          "field-shell relative flex items-center border-b transition-colors duration-200",
           error
             ? "border-ember-600"
             : "border-ink/20 hover:border-ink/45 focus-within:border-ember"
@@ -65,7 +72,7 @@ const FormField = forwardRef(function FormField(
           <Icon
             aria-hidden="true"
             className={clsx(
-              "shrink-0 mr-3 transition-colors duration-200",
+              "field-icon shrink-0 mr-3 transition-colors duration-200",
               error ? "text-ember-600" : "text-ink/35 group-focus-within/field:text-ember"
             )}
             size={16}
@@ -83,6 +90,7 @@ const FormField = forwardRef(function FormField(
             "placeholder:text-ink/30 placeholder:font-light",
             "outline-none focus:outline-none",
             "selection:bg-ink selection:text-paper",
+            "caret-ember",
             isPassword ? "pr-10" : ""
           )}
           {...props}
@@ -104,7 +112,7 @@ const FormField = forwardRef(function FormField(
         )}
       </div>
 
-      {hint && !error && (
+      {hint && !error && !trailing && (
         <p
           id={hintId}
           className="sm:hidden mt-1.5 font-mono text-[10px] tracking-wider text-ink/45 lowercase"

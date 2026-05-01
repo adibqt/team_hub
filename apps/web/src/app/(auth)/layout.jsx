@@ -25,7 +25,9 @@ const FEATURES = [
 
 export default function AuthLayout({ children }) {
   return (
-    <div className="relative min-h-screen flex flex-col lg:grid lg:grid-cols-12 bg-paper text-ink">
+    <div className="relative min-h-screen flex flex-col lg:grid lg:grid-cols-12 bg-paper text-ink overflow-hidden">
+      {/* Aurora — drifting ember + sage glows. Visible only in `.dark`. */}
+      <div className="aurora" aria-hidden="true" />
       {/* paper grain over the entire surface */}
       <div className="grain" aria-hidden="true" />
 
@@ -136,7 +138,9 @@ export default function AuthLayout({ children }) {
           FORM PANEL (right)
          ============================================================ */}
       <main className="order-1 lg:order-none relative z-10 lg:col-span-5 px-6 sm:px-10 lg:px-12 py-10 lg:py-14 flex flex-col items-center">
-        <div className="w-full max-w-md flex-1 flex flex-col">
+        {/* Warm desk-lamp spotlight for dark mode only. */}
+        <div className="spotlight" aria-hidden="true" />
+        <div className="relative w-full max-w-md flex-1 flex flex-col">
           {children}
         </div>
 

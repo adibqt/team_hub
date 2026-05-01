@@ -88,12 +88,27 @@ module.exports = {
           "0%, 49%":   { opacity: "1" },
           "50%, 100%": { opacity: "0" },
         },
+        "stagger-up": {
+          "0%":   { opacity: "0", transform: "translateY(14px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "drift-y": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%":      { transform: "translateY(-4px)" },
+        },
+        "caret": {
+          "0%, 50%":  { opacity: "1" },
+          "51%, 100%":{ opacity: "0" },
+        },
       },
       animation: {
         "fade-up": "fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
         "fade-in": "fade-in 0.6s ease-out both",
         "rule-grow": "rule-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
         "blink": "blink 1.1s steps(1) infinite",
+        "stagger-up": "stagger-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "drift-y": "drift-y 4.5s ease-in-out infinite",
+        "caret": "caret 1.05s steps(1) infinite",
       },
       backgroundImage: {
         "grain": "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.45 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>\")",

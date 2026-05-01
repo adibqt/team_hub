@@ -145,6 +145,229 @@ body {
   mix-blend-mode: var(--grain-blend);
 }
 
+/* ─── Dark "After Hours" atmosphere ──────────────────────────────
+   Layered ambient gradients that only render in `.dark` mode. They
+   imply a warm desk lamp + a distant cool window — depth without
+   washing out the editorial restraint. */
+.aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 600ms ease-out;
+}
+.dark .aurora {
+  opacity: 1;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  will-change: transform;
+}
+.aurora::before {
+  top: -22%;
+  right: -18%;
+  width: 56rem;
+  height: 56rem;
+  background: radial-gradient(closest-side,
+    rgb(var(--color-ember) / 0.22) 0%,
+    rgb(var(--color-ember) / 0.08) 40%,
+    transparent 72%);
+  animation: aurora-a 24s ease-in-out infinite;
+}
+.aurora::after {
+  bottom: -28%;
+  left: -16%;
+  width: 50rem;
+  height: 50rem;
+  background: radial-gradient(closest-side,
+    rgb(var(--color-sage) / 0.16) 0%,
+    rgb(var(--color-sage) / 0.05) 45%,
+    transparent 75%);
+  animation: aurora-b 30s ease-in-out infinite;
+}
+
+/* Warm "desk-lamp" spotlight behind the form column. Light mode = none. */
+.spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(60% 50% at 80% 20%,
+      rgb(var(--color-ember) / 0.10) 0%,
+      transparent 70%),
+    radial-gradient(50% 60% at 20% 90%,
+      rgb(var(--color-ember) / 0.06) 0%,
+      transparent 70%);
+  transition: opacity 600ms ease-out;
+}
+.dark .spotlight {
+  opacity: 1;
+}
+
+/* Ember accents — the orange "." finally glows like a real ember
+   in dark mode. No effect in light mode (keeps the printed feel). */
+.ember-glow {
+  display: inline-block;
+}
+.dark .ember-glow {
+  text-shadow:
+    0 0 6px rgb(var(--color-ember) / 0.55),
+    0 0 14px rgb(var(--color-ember) / 0.35),
+    0 0 28px rgb(var(--color-ember) / 0.20);
+  animation: ember-flicker 3.6s ease-in-out infinite;
+}
+
+/* Form-field focus halo — ink-soft underglow that lights up the
+   bottom hairline + icon when the user is typing. */
+.field-shell {
+  position: relative;
+}
+.field-shell::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 8px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(to bottom,
+    rgb(var(--color-ember) / 0.55) 0%,
+    transparent 100%);
+  filter: blur(6px);
+  transform: scaleX(0.2);
+  transform-origin: left center;
+  transition: opacity 240ms ease-out, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dark .field-shell:focus-within::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.dark .field-shell:focus-within .field-icon {
+  filter: drop-shadow(0 0 6px rgb(var(--color-ember) / 0.55));
+}
+
+/* Submit button — dark mode gets a soft heat halo on hover/focus.
+   Light mode keeps the original flat behavior. */
+.heat-btn {
+  position: relative;
+  isolation: isolate;
+}
+.heat-btn::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(70% 120% at 50% 50%,
+    rgb(var(--color-ember) / 0.55) 0%,
+    rgb(var(--color-ember) / 0.20) 40%,
+    transparent 75%);
+  opacity: 0;
+  filter: blur(14px);
+  transition: opacity 320ms ease-out;
+}
+.dark .heat-btn:hover:not(:disabled)::before,
+.dark .heat-btn:focus-visible:not(:disabled)::before {
+  opacity: 1;
+}
+.dark .heat-btn:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px rgb(var(--color-ember) / 0.30),
+    0 8px 30px -8px rgb(var(--color-ember) / 0.40);
+}
+
+/* Headline rule shimmer — a single travelling glint, fires on load.
+   Subtle in light, more pronounced (with ember tint) in dark. */
+.shimmer-rule {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-rule::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgb(var(--color-ember) / 0.55) 50%,
+    transparent 100%);
+  transform: translateX(-100%);
+  animation: shimmer 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.9s 1 forwards;
+}
+.dark .shimmer-rule::after {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgb(var(--color-ember) / 0.85) 50%,
+    transparent 100%);
+}
+
+/* "Encrypted channel" pulse — used on the after-hours chip. */
+.signal-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgb(var(--color-ember));
+}
+.signal-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--color-ember) / 0.55);
+  animation: signal-ring 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.dark .signal-dot {
+  box-shadow:
+    0 0 6px rgb(var(--color-ember) / 0.7),
+    0 0 14px rgb(var(--color-ember) / 0.35);
+}
+
+@keyframes aurora-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-40px, 30px, 0) scale(1.06); }
+}
+@keyframes aurora-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(30px, -40px, 0) scale(1.10); }
+}
+@keyframes ember-flicker {
+  0%, 100% {
+    text-shadow:
+      0 0 6px  rgb(var(--color-ember) / 0.55),
+      0 0 14px rgb(var(--color-ember) / 0.35),
+      0 0 28px rgb(var(--color-ember) / 0.20);
+  }
+  47%      {
+    text-shadow:
+      0 0 4px  rgb(var(--color-ember) / 0.40),
+      0 0 10px rgb(var(--color-ember) / 0.22);
+  }
+  50%, 53% {
+    text-shadow:
+      0 0 10px rgb(var(--color-ember) / 0.85),
+      0 0 22px rgb(var(--color-ember) / 0.55),
+      0 0 40px rgb(var(--color-ember) / 0.30);
+  }
+}
+@keyframes shimmer {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(110%); }
+}
+@keyframes signal-ring {
+  0%   { transform: scale(0.6); opacity: 0.9; }
+  80%  { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
 /* ─── Announcement / rich-text prose ─────────────────────────────
    Shared by the TipTap editor surface (`.rte-prose`) and the read-only
    render (`.announcement-prose`). Tunes spacing and emphasis to feel at
