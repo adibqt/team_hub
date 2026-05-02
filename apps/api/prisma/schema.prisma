@@ -168,10 +168,12 @@ model ActionItem {
   priority    Priority @default(MEDIUM)
   status      ItemStatus @default(TODO)
   dueDate     DateTime?
+  completedAt DateTime?
   createdAt   DateTime @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   goal        Goal?     @relation(fields: [goalId], references: [id])
   assignee    User?     @relation("Assignee", fields: [assigneeId], references: [id])
+  @@index([workspaceId, completedAt])
 }
 
 model Notification {

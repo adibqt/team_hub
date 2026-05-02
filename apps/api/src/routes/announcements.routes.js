@@ -450,38 +450,27 @@ r.post("/announcements/:id/comments", requireAuth, async (req, res, next) => {
         announcementTitle: announcement.title,
         preview,
       };
-      await prisma.notification.createMany({
+      // Single round-trip insert + return so we have stable ids for the
+      // socket emit without a follow-up findMany.
+      const created = await prisma.notification.createManyAndReturn({
         data: targets.map((userId) => ({
           userId,
           type: "mention",
           payload: payloadBase,
         })),
       });
-      // Re-fetch the freshly-created rows so we can emit them with stable ids.
-      const fresh = await prisma.notification.findMany({
-        where: {
-          userId: { in: targets },
-          type: "mention",
-          createdAt: { gte: new Date(Date.now() - 60_000) },
-          // payload->>'commentId' filtering isn't portable across Prisma versions;
-          // narrow by commentId in JS instead.
-        },
-        orderBy: { createdAt: "desc" },
-        take: targets.length * 2,
-      });
-      const byUser = new Map();
-      for (const n of fresh) {
-        if (n.payload?.commentId === comment.id && !byUser.has(n.userId)) {
-          byUser.set(n.userId, n);
-        }
+      for (const note of created) {
+        io.to(`user:${note.userId}`).emit("notification:new", note);
       }
-      for (const userId of targets) {
-        const note = byUser.get(userId);
-        if (note) io.to(`user:${userId}`).emit("notification:new", note);
 
-        const recipient = recipientsById.get(userId);
-        if (recipient?.email) {
-          await sendMentionEmail({
+      // Fan emails out concurrently. A slow SMTP/Brevo round-trip per
+      // recipient previously made the comment endpoint scale linearly with
+      // mention count.
+      await Promise.allSettled(
+        targets.map((userId) => {
+          const recipient = recipientsById.get(userId);
+          if (!recipient?.email) return null;
+          return sendMentionEmail({
             to: recipient.email,
             recipientName: recipient.name,
             actorName: comment.author?.name || "Someone",
@@ -491,8 +480,8 @@ r.post("/announcements/:id/comments", requireAuth, async (req, res, next) => {
             commentPreview: emailPreview,
             announcementUrl,
           });
-        }
-      }
+        })
+      );
     }
 
     const updated = await loadAnnouncementForFeed(req.params.id);

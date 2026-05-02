@@ -13,7 +13,16 @@ r.get("/:id/analytics/summary", requireAuth, requireMember, async (req, res, nex
 
     const [totalGoals, itemsCompletedThisWeek, overdueGoals, overdueItems] = await Promise.all([
       prisma.goal.count({ where: { workspaceId: wsId } }),
-      prisma.actionItem.count({ where: { workspaceId: wsId, status: "DONE", createdAt: { gte: weekAgo } } }),
+      // "Completed this week" must mean *completed* in the last seven
+      // days — not "currently DONE and happens to have been created in
+      // the window," which is what `createdAt` would measure.
+      prisma.actionItem.count({
+        where: {
+          workspaceId: wsId,
+          status: "DONE",
+          completedAt: { gte: weekAgo, lte: now },
+        },
+      }),
       prisma.goal.count({ where: { workspaceId: wsId, dueDate: { lt: now }, status: { not: "COMPLETED" } } }),
       prisma.actionItem.count({ where: { workspaceId: wsId, dueDate: { lt: now }, status: { not: "DONE" } } }),
     ]);
@@ -69,39 +78,53 @@ function csvEscape(v) {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+// Stream rows in pages so a workspace with tens of thousands of goals or
+// action items doesn't have to fit the whole export in memory at once.
+async function streamTable(res, model, where, formatRow) {
+  const PAGE = 500;
+  let cursor;
+  while (true) {
+    const batch = await model.findMany({
+      where,
+      orderBy: { id: "asc" },
+      take: PAGE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+    });
+    if (!batch.length) break;
+    for (const row of batch) res.write(formatRow(row));
+    if (batch.length < PAGE) break;
+    cursor = batch[batch.length - 1].id;
+  }
+}
+
 r.get("/:id/export.csv", requireAuth, requireMember, async (req, res, next) => {
   try {
-    const [goals, items] = await Promise.all([
-      prisma.goal.findMany({ where: { workspaceId: req.params.id } }),
-      prisma.actionItem.findMany({ where: { workspaceId: req.params.id } }),
-    ]);
+    const where = { workspaceId: req.params.id };
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename=workspace-${req.params.id}.csv`);
     res.write("type,id,title,status,dueDate,createdAt\n");
-    goals.forEach((g) =>
-      res.write(
-        [
-          "goal",
-          csvEscape(g.id),
-          csvEscape(g.title),
-          csvEscape(g.status),
-          csvEscape(g.dueDate ? g.dueDate.toISOString() : ""),
-          csvEscape(g.createdAt.toISOString()),
-        ].join(",") + "\n"
-      )
+
+    await streamTable(res, prisma.goal, where, (g) =>
+      [
+        "goal",
+        csvEscape(g.id),
+        csvEscape(g.title),
+        csvEscape(g.status),
+        csvEscape(g.dueDate ? g.dueDate.toISOString() : ""),
+        csvEscape(g.createdAt.toISOString()),
+      ].join(",") + "\n"
     );
-    items.forEach((i) =>
-      res.write(
-        [
-          "item",
-          csvEscape(i.id),
-          csvEscape(i.title),
-          csvEscape(i.status),
-          csvEscape(i.dueDate ? i.dueDate.toISOString() : ""),
-          csvEscape(i.createdAt.toISOString()),
-        ].join(",") + "\n"
-      )
+    await streamTable(res, prisma.actionItem, where, (i) =>
+      [
+        "item",
+        csvEscape(i.id),
+        csvEscape(i.title),
+        csvEscape(i.status),
+        csvEscape(i.dueDate ? i.dueDate.toISOString() : ""),
+        csvEscape(i.createdAt.toISOString()),
+      ].join(",") + "\n"
     );
+
     res.end();
   } catch (e) { next(e); }
 });

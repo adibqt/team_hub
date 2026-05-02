@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Download, ScrollText, AlertTriangle } from "lucide-react";
 import api from "@/lib/api";
@@ -61,21 +61,22 @@ export default function AuditPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const startIdx = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const endIdx = Math.min(page * PAGE_SIZE, total);
-  const accent = ws?.accentColor || "#D34F1F";
   const isAdmin = ws?.viewerRole === "ADMIN";
   const csvHref = `${process.env.NEXT_PUBLIC_API_URL}/api/workspaces/${workspaceId}/audit.csv`;
 
-  const filteredRows = useMemo(() => rows, [rows]);
+  const hasActiveFilters = Object.values(debouncedFilters).some((v) => v);
 
   return (
-    <div className="relative max-w-[1200px] mx-auto px-6 sm:px-10 lg:px-14 py-10 lg:py-14">
+    <div className="relative max-w-[1100px] mx-auto px-6 sm:px-10 lg:px-14 py-10 lg:py-14">
+      {/* ============================================================ HEADER */}
       <header className="animate-fade-up">
         <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-widest2 text-ink/55">
-          <span aria-hidden="true" className="inline-block h-px w-8" style={{ background: accent }} />
+          <span aria-hidden="true" className="inline-block h-px w-8 bg-ember" />
           <span>Workspace · {ws?.name || "—"}</span>
           <span className="hidden sm:inline text-ink/25">/</span>
-          <span className="hidden sm:inline">Audit log</span>
+          <span className="hidden sm:inline">Ledger</span>
         </div>
+
         <div className="mt-5 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
           <div>
             <h1 className="font-display text-[clamp(2rem,4.5vw,3.25rem)] leading-[1.05] tracking-[-0.02em] text-ink">
@@ -83,167 +84,229 @@ export default function AuditPage() {
               <span className="text-ember">.</span>
             </h1>
             <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink/65">
-              Immutable timeline of workspace activity, filterable by actor, action, and date range.
+              Immutable timeline of workspace activity — filterable by actor, action, and date.
             </p>
           </div>
-          {isAdmin ? (
-            <a
-              href={csvHref}
-              className="inline-flex items-center gap-2.5 bg-ink text-paper px-4 py-2.5 hover:bg-ink-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
-            >
-              <Download size={14} strokeWidth={1.75} aria-hidden="true" />
-              <span className="font-mono text-[10px] uppercase tracking-widest2">Download CSV</span>
-            </a>
-          ) : (
-            <div className="flex flex-col items-start gap-1">
-              <button
-                type="button"
-                disabled
-                aria-disabled="true"
-                title="Only admins can download the audit CSV."
-                className="inline-flex items-center gap-2.5 bg-ink/30 text-paper px-4 py-2.5 cursor-not-allowed"
+          <div className="flex items-center gap-4">
+            <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45 tabular-nums">
+              {loading ? "loading…" : total === 0 ? "no entries" : `${total} entr${total === 1 ? "y" : "ies"}`}
+            </p>
+            {isAdmin && (
+              <a
+                href={csvHref}
+                className="inline-flex items-center gap-2.5 bg-ink text-paper px-4 py-2.5 hover:bg-ink-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
               >
                 <Download size={14} strokeWidth={1.75} aria-hidden="true" />
-                <span className="font-mono text-[10px] uppercase tracking-widest2">Download CSV</span>
-              </button>
-              <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45">
-                Admins only
-              </p>
-            </div>
-          )}
+                <span className="font-mono text-[10px] uppercase tracking-widest2">
+                  Download CSV
+                </span>
+              </a>
+            )}
+          </div>
         </div>
       </header>
 
-      <section className="mt-10 animate-fade-up" style={{ animationDelay: "0.05s" }}>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-ink/10 border border-ink/10 p-3 sm:p-4">
-          <input
-            className="border border-ink/15 bg-paper px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
-            placeholder="Actor name or email…"
+      {/* ============================================================ FILTERS */}
+      <section className="mt-12 animate-fade-up" style={{ animationDelay: "0.05s" }}>
+        <div className="flex items-end justify-between pb-3 border-b border-ink/15">
+          <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55">
+            <span className="text-ember">§</span>&nbsp;Filters · 01
+          </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setPage(1);
+                setFilters({ actor: "", action: "", from: "", to: "" });
+              }}
+              className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55 hover:text-ember transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <FilterField
+            label="Actor"
             value={filters.actor}
-            onChange={(e) => {
-              setPage(1);
-              setFilters((f) => ({ ...f, actor: e.target.value }));
-            }}
+            onChange={(v) => { setPage(1); setFilters((f) => ({ ...f, actor: v })); }}
+            placeholder="Name or email…"
           />
-          <input
-            className="border border-ink/15 bg-paper px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
-            placeholder="Action…"
+          <FilterField
+            label="Action"
             value={filters.action}
-            onChange={(e) => {
-              setPage(1);
-              setFilters((f) => ({ ...f, action: e.target.value }));
-            }}
+            onChange={(v) => { setPage(1); setFilters((f) => ({ ...f, action: v })); }}
+            placeholder="e.g. goal.create"
           />
-          <input
-            className="border border-ink/15 bg-paper px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
+          <FilterField
+            label="From"
             type="date"
-            placeholder="From"
             value={filters.from}
-            onChange={(e) => {
-              setPage(1);
-              setFilters((f) => ({ ...f, from: e.target.value }));
-            }}
+            onChange={(v) => { setPage(1); setFilters((f) => ({ ...f, from: v })); }}
           />
-          <input
-            className="border border-ink/15 bg-paper px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
+          <FilterField
+            label="To"
             type="date"
-            placeholder="To"
             value={filters.to}
-            onChange={(e) => {
-              setPage(1);
-              setFilters((f) => ({ ...f, to: e.target.value }));
-            }}
+            onChange={(v) => { setPage(1); setFilters((f) => ({ ...f, to: v })); }}
           />
         </div>
       </section>
 
-      <section className="mt-8 animate-fade-up" style={{ animationDelay: "0.1s" }}>
-        <div className="pb-3 border-b border-ink/15 flex items-end justify-between">
+      {/* ============================================================ LEDGER */}
+      <section className="mt-14 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+        <div className="flex items-end justify-between pb-3 border-b border-ink/15">
           <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/55">
-            <span className="text-ember">§</span>&nbsp;Entries · 01
+            <span className="text-ember">§</span>&nbsp;Entries · 02
           </p>
-          <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/40">
-            {loading ? "loading…" : total === 0 ? "No entries" : `Showing ${startIdx}–${endIdx} of ${total}`}
+          <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/40 tabular-nums">
+            {loading
+              ? "loading…"
+              : total === 0
+              ? "—"
+              : `${startIdx}–${endIdx} of ${total}`}
           </p>
         </div>
 
         {error ? (
-          <div className="mt-4 border border-ember/40 bg-ember-50/40 px-4 py-3 text-sm text-ember inline-flex items-center gap-2">
+          <div className="mt-6 inline-flex items-center gap-2 border border-ember/40 bg-ember-50 px-4 py-3 text-sm text-ember">
             <AlertTriangle size={14} strokeWidth={1.75} />
             {error}
           </div>
+        ) : loading ? (
+          <LedgerSkeleton />
+        ) : rows.length === 0 ? (
+          <div className="mt-8 px-6 py-12 border border-dashed border-ink/15 bg-paper-50 text-center">
+            <ScrollText size={20} strokeWidth={1.5} className="mx-auto text-ink/35" />
+            <p className="mt-3 font-mono text-[11px] uppercase tracking-widest2 text-ink/55">
+              {hasActiveFilters ? "No entries match your filters" : "No audit entries yet"}
+            </p>
+            <p className="mt-2 text-sm text-ink/55">
+              {hasActiveFilters
+                ? "Try widening the date range or clearing the actor/action filters."
+                : "Activity in this workspace will appear here as soon as it happens."}
+            </p>
+          </div>
         ) : (
-          <div className="mt-4 border border-ink/10 overflow-x-auto bg-paper">
-            <table className="w-full min-w-[920px] text-sm border-collapse">
-              <thead className="bg-paper-50 border-b border-ink/10 font-mono text-[10px] uppercase tracking-widest2 text-ink/45">
-                <tr>
-                  {["When", "Actor", "Action", "Entity", "ID"].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left font-normal">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-ink/45 font-mono text-[10px] uppercase tracking-widest2">
-                      loading…
-                    </td>
-                  </tr>
-                ) : filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-ink/45 font-mono text-[10px] uppercase tracking-widest2">
-                      No audit entries
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRows.map((r) => (
-                    <tr key={r.id} className="border-b border-ink/10 last:border-b-0 hover:bg-paper-50">
-                      <td className="px-4 py-3 text-ink/55">{new Date(r.createdAt).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-ink">{r.actor?.name || "Unknown"}</td>
-                      <td className="px-4 py-3 font-mono text-[11px] uppercase tracking-widest2 text-ink/70">{r.action}</td>
-                      <td className="px-4 py-3 text-ink/75">{r.entityType}</td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-ink/45">{r.entityId?.slice(0, 12)}…</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <ul className="mt-2 divide-y divide-ink/10">
+            {rows.map((r, i) => {
+              const idx = (page - 1) * PAGE_SIZE + i + 1;
+              return (
+                <li
+                  key={r.id}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-4 sm:gap-6 py-4"
+                >
+                  <span className="hidden sm:block font-mono text-[10px] tabular-nums text-ink/40 tracking-widest2 w-10">
+                    {String(idx).padStart(3, "0")}
+                  </span>
+
+                  <div className="min-w-0">
+                    <p className="text-[15px] text-ink truncate">
+                      <span className="font-display italic">{r.actor?.name || "Unknown"}</span>
+                      <span className="text-ink/45"> · </span>
+                      <span className="font-mono text-[11px] uppercase tracking-widest2 text-ink/70">
+                        {r.action}
+                      </span>
+                    </p>
+                    <p className="mt-1 font-mono text-[10px] uppercase tracking-widest2 text-ink/45">
+                      {r.entityType}
+                      <span className="text-ink/25"> · </span>
+                      <span className="text-ink/40">{r.entityId?.slice(0, 12)}…</span>
+                    </p>
+                  </div>
+
+                  <p className="text-right font-mono text-[10px] uppercase tracking-widest2 text-ink/55 tabular-nums whitespace-nowrap">
+                    {new Date(r.createdAt).toLocaleString(undefined, {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {!error && total > PAGE_SIZE && (
+          <div className="mt-6 flex items-center justify-between gap-3 flex-wrap">
+            <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/40 tabular-nums">
+              Page {page} / {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-ink/15 font-mono text-[10px] uppercase tracking-widest2 text-ink/70 hover:border-ink/45 hover:bg-paper-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-ink/15 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
+              >
+                <ChevronLeft size={12} strokeWidth={1.75} aria-hidden="true" />
+                Prev
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-ink/15 font-mono text-[10px] uppercase tracking-widest2 text-ink/70 hover:border-ink/45 hover:bg-paper-50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-ink/15 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ember"
+              >
+                Next
+                <ChevronRight size={12} strokeWidth={1.75} aria-hidden="true" />
+              </button>
+            </div>
           </div>
         )}
       </section>
 
-      <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
-        <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/40">
-          Page {page} / {totalPages}
-        </p>
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest2">
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            className="inline-flex items-center gap-1 px-3 py-2 border border-ink/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-paper-50"
-          >
-            <ChevronLeft size={14} strokeWidth={1.75} aria-hidden="true" />
-            Prev
-          </button>
-          <button
-            type="button"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            className="inline-flex items-center gap-1 px-3 py-2 border border-ink/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-paper-50"
-          >
-            Next
-            <ChevronRight size={14} strokeWidth={1.75} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-
-      <footer className="mt-14 pt-6 border-t border-ink/15">
-        <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45 flex items-center gap-2">
-          <ScrollText size={12} strokeWidth={1.75} />
-          Immutable events ledger
+      <footer className="mt-20 pt-6 border-t border-ink/15">
+        <p className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45 flex flex-wrap items-center gap-x-4 gap-y-2 justify-between">
+          <span className="inline-flex items-center gap-2">
+            <ScrollText size={12} strokeWidth={1.75} />
+            Immutable events ledger
+          </span>
+          {!isAdmin && (
+            <span className="text-ink/40">CSV export restricted to admins</span>
+          )}
         </p>
       </footer>
     </div>
+  );
+}
+
+function FilterField({ label, value, onChange, type = "text", placeholder }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="font-mono text-[10px] uppercase tracking-widest2 text-ink/45">
+        {label}
+      </span>
+      <input
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="bg-paper border border-ink/15 px-3 py-2 text-sm text-ink placeholder:text-ink/35 hover:border-ink/45 focus:border-ink/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-ember transition-colors"
+      />
+    </label>
+  );
+}
+
+function LedgerSkeleton() {
+  return (
+    <ul aria-hidden="true" className="mt-2 divide-y divide-ink/10">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <li
+          key={i}
+          className="grid grid-cols-[auto_1fr_auto] items-center gap-4 sm:gap-6 py-4"
+        >
+          <div className="hidden sm:block h-3 w-8 bg-ink/10 animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-4 w-1/2 bg-ink/10 animate-pulse" />
+            <div className="h-3 w-1/3 bg-ink/5 animate-pulse" />
+          </div>
+          <div className="h-3 w-24 bg-ink/10 animate-pulse" />
+        </li>
+      ))}
+    </ul>
   );
 }

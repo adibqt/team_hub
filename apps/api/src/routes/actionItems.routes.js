@@ -74,6 +74,7 @@ r.post("/workspaces/:wsId/items", requireAuth, requireMember, async (req, res, n
       }
     }
 
+    const initialStatus = status || "TODO";
     const item = await prisma.actionItem.create({
       data: {
         workspaceId: req.params.wsId,
@@ -81,9 +82,12 @@ r.post("/workspaces/:wsId/items", requireAuth, requireMember, async (req, res, n
         description: description?.trim() || null,
         assigneeId: assigneeId || null,
         priority: priority || "MEDIUM",
-        status: status || "TODO",
+        status: initialStatus,
         dueDate: due ?? null,
         goalId: goalId || null,
+        // Stamp completion at create time when an item is born DONE so
+        // analytics can aggregate by completion period rather than creation.
+        completedAt: initialStatus === "DONE" ? new Date() : null,
       },
       include: ITEM_INCLUDE,
     });
@@ -144,6 +148,14 @@ r.patch("/items/:id", requireAuth, requireItemMember, async (req, res, next) => 
         return res.status(400).json({ error: `status must be one of ${VALID_STATUSES.join(", ")}` });
       }
       data.status = status;
+      // Stamp the first DONE transition; clear if a completed item is
+      // moved back. Re-completing an already-DONE item leaves the original
+      // completion timestamp intact.
+      if (status === "DONE" && req.item.status !== "DONE") {
+        data.completedAt = new Date();
+      } else if (status !== "DONE" && req.item.status === "DONE") {
+        data.completedAt = null;
+      }
     }
     if (dueDate !== undefined) {
       const due = parseDueDate(dueDate);
