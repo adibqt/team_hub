@@ -170,31 +170,39 @@ export default function AnalyticsPage() {
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={chartData} margin={{ top: 16, right: 16, left: 0, bottom: 8 }}>
-                <CartesianGrid stroke="rgba(20,18,16,0.08)" vertical={false} />
+                <CartesianGrid stroke="rgb(var(--color-ink) / 0.1)" vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 10, fontFamily: "var(--font-mono, monospace)", fill: "rgba(20,18,16,0.55)" }}
+                  tick={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono, monospace)",
+                    fill: "rgb(var(--color-ink) / 0.55)",
+                  }}
                   tickLine={false}
-                  axisLine={{ stroke: "rgba(20,18,16,0.15)" }}
+                  axisLine={{ stroke: "rgb(var(--color-ink) / 0.2)" }}
                 />
                 <YAxis
                   allowDecimals={false}
-                  tick={{ fontSize: 10, fontFamily: "var(--font-mono, monospace)", fill: "rgba(20,18,16,0.55)" }}
+                  tick={{
+                    fontSize: 10,
+                    fontFamily: "var(--font-mono, monospace)",
+                    fill: "rgb(var(--color-ink) / 0.55)",
+                  }}
                   tickLine={false}
-                  axisLine={{ stroke: "rgba(20,18,16,0.15)" }}
+                  axisLine={{ stroke: "rgb(var(--color-ink) / 0.2)" }}
                   width={32}
                 />
                 <Tooltip
-                  cursor={{ fill: "rgba(20,18,16,0.04)" }}
+                  cursor={{ fill: "rgb(var(--color-ink) / 0.06)" }}
                   contentStyle={{
-                    background: "#FAF7F2",
-                    border: "1px solid rgba(20,18,16,0.15)",
+                    background: "var(--paper-2)",
+                    border: "1px solid rgb(var(--color-ink) / 0.2)",
                     borderRadius: 0,
                     fontFamily: "var(--font-mono, monospace)",
                     fontSize: 11,
                     textTransform: "uppercase",
                     letterSpacing: "0.08em",
-                    color: "rgb(20,18,16)",
+                    color: "var(--ink)",
                   }}
                   labelFormatter={(l) => (l === "This week" ? l : `Week of ${l}`)}
                   formatter={(value) => [value, "Completed"]}
