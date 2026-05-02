@@ -1,10 +1,40 @@
 import nodemailer from "nodemailer";
 import dns from "node:dns";
+import { Resend } from "resend";
 import { env } from "../config/env.js";
 
-// Railway's egress doesn't route IPv6. Force every DNS lookup the mailer
-// performs through here to return only A (IPv4) records, so smtp.gmail.com
-// never resolves to an unreachable AAAA address.
+/* ────────────────────────────────────────────────────────────────
+   Two backends:
+     • Resend (HTTP) — used when RESEND_API_KEY is set. Required on
+       Railway and other PaaS that block outbound SMTP ports.
+     • Nodemailer / SMTP — fallback for local dev or self-hosted.
+   If neither is configured, every send becomes a no-op + warning.
+   ──────────────────────────────────────────────────────────────── */
+
+function useResend() {
+  return Boolean(env.RESEND_API_KEY);
+}
+
+function useSmtp() {
+  return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+}
+
+function isMailEnabled() {
+  return useResend() || useSmtp();
+}
+
+// ── Resend ────────────────────────────────────────────────────────
+let resend = null;
+function getResend() {
+  if (!useResend()) return null;
+  if (!resend) {
+    resend = new Resend(env.RESEND_API_KEY);
+    console.log("[mailer] Resend ready");
+  }
+  return resend;
+}
+
+// ── SMTP (fallback) ──────────────────────────────────────────────
 function ipv4Lookup(hostname, options, callback) {
   if (typeof options === "function") {
     callback = options;
@@ -13,34 +43,23 @@ function ipv4Lookup(hostname, options, callback) {
   return dns.lookup(hostname, { ...options, family: 4 }, callback);
 }
 
-/* ────────────────────────────────────────────────────────────────
-   Transporter — built lazily so the API can boot without SMTP
-   credentials. If SMTP_HOST is not set, every send becomes a
-   no-op + console warning, which keeps local dev frictionless.
-   ──────────────────────────────────────────────────────────────── */
-
 let transporter = null;
 let verifyPromise = null;
 
-function isMailEnabled() {
-  return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
-}
-
 function getTransporter() {
-  if (!isMailEnabled()) return null;
+  if (!useSmtp()) return null;
   if (transporter) return transporter;
 
   transporter = nodemailer.createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
-    secure: env.SMTP_SECURE, // true for 465, false for 587/2525
+    secure: env.SMTP_SECURE,
     auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
     family: 4,
     tls: { family: 4, lookup: ipv4Lookup },
     lookup: ipv4Lookup,
   });
 
-  // Verify once on first use; surface auth/host issues early in dev logs.
   verifyPromise = transporter
     .verify()
     .then(() => console.log(`[mailer] SMTP ready · ${env.SMTP_HOST}:${env.SMTP_PORT}`))
@@ -53,6 +72,33 @@ function fromAddress() {
   const addr = env.MAIL_FROM || env.SMTP_USER;
   if (!addr) return undefined;
   return env.MAIL_FROM_NAME ? `"${env.MAIL_FROM_NAME}" <${addr}>` : addr;
+}
+
+/**
+ * Send through whichever backend is active. Returns nodemailer-shaped
+ * `{ messageId }` on success, throws on failure.
+ */
+async function deliver({ to, subject, text, html, replyTo }) {
+  if (useResend()) {
+    const from = fromAddress();
+    if (!from) throw new Error("MAIL_FROM is required when using Resend");
+    const r = getResend();
+    const { data, error } = await r.emails.send({
+      from,
+      to,
+      subject,
+      text,
+      html,
+      reply_to: replyTo || undefined,
+    });
+    if (error) throw new Error(error.message || String(error));
+    return { messageId: data?.id };
+  }
+
+  const t = getTransporter();
+  if (verifyPromise) await verifyPromise.catch(() => {});
+  const info = await t.sendMail({ from: fromAddress(), to, subject, text, html, replyTo });
+  return { messageId: info.messageId };
 }
 
 function escapeHtml(str = "") {
@@ -90,9 +136,6 @@ export async function sendInviteEmail({
     );
     return { sent: false, skipped: "smtp-not-configured" };
   }
-
-  const t = getTransporter();
-  if (verifyPromise) await verifyPromise.catch(() => {});
 
   const safeWorkspace = escapeHtml(workspaceName);
   const safeInviter = escapeHtml(inviterName || "A teammate");
@@ -190,13 +233,12 @@ export async function sendInviteEmail({
 </html>`;
 
   try {
-    const info = await t.sendMail({
-      from: fromAddress(),
+    const info = await deliver({
       to,
-      replyTo: inviterEmail || undefined,
       subject,
       text,
       html,
+      replyTo: inviterEmail || undefined,
     });
     return { sent: true, messageId: info.messageId };
   } catch (err) {
@@ -228,9 +270,6 @@ export async function sendMentionEmail({
     );
     return { sent: false, skipped: "smtp-not-configured" };
   }
-
-  const t = getTransporter();
-  if (verifyPromise) await verifyPromise.catch(() => {});
 
   const safeRecipient = escapeHtml(recipientName || "there");
   const safeActor = escapeHtml(actorName || "Someone");
@@ -325,13 +364,7 @@ export async function sendMentionEmail({
 </html>`;
 
   try {
-    const info = await t.sendMail({
-      from: fromAddress(),
-      to,
-      subject,
-      text,
-      html,
-    });
+    const info = await deliver({ to, subject, text, html });
     return { sent: true, messageId: info.messageId };
   } catch (err) {
     console.error(`[mailer] Failed to send mention email to ${to}:`, err.message);

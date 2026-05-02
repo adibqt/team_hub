@@ -11,9 +11,12 @@ export const env = {
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:3000",
 
-  // ── SMTP / Nodemailer ──────────────────────────────────────────
-  // Leave SMTP_HOST blank to disable outbound mail (invite links will
-  // still be created and copyable; the mailer just no-ops).
+  // ── Mail ───────────────────────────────────────────────────────
+  // Preferred: Resend HTTP API (works on Railway, which blocks SMTP).
+  // If RESEND_API_KEY is set, the mailer uses it and ignores SMTP_*.
+  // Otherwise it falls back to nodemailer + SMTP for local dev.
+  RESEND_API_KEY: process.env.RESEND_API_KEY || "",
+
   SMTP_HOST: process.env.SMTP_HOST || "",
   SMTP_PORT: Number(process.env.SMTP_PORT) || 587,
   SMTP_SECURE:
