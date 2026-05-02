@@ -46,7 +46,7 @@ export default function MentionInput({
     const mentionIds = dedupeMentionIds(nextRanges);
     setMentionRanges(nextRanges);
     onValueChange?.({ text: next, mentions: mentionIds });
-    onChange(next);
+    onChange?.(next);
     onMentionsChange?.(mentionIds);
     refreshMentionState(next, e.target.selectionStart);
   }
@@ -96,7 +96,7 @@ export default function MentionInput({
     const mentionIds = dedupeMentionIds(nextRanges);
     setMentionRanges(nextRanges);
     onValueChange?.({ text: next, mentions: mentionIds });
-    onChange(next);
+    onChange?.(next);
     onMentionsChange?.(mentionIds);
     setOpen(false);
     setAnchor(null);

@@ -159,12 +159,13 @@ pnpm --filter api db:deploy     # apply migrations in production
 | `CLOUDINARY_CLOUD_NAME` |    —     | —                                                 | Required only if avatar/attachment uploads are used.                               |
 | `CLOUDINARY_API_KEY`    |    —     | —                                                 | Same.                                                                              |
 | `CLOUDINARY_API_SECRET` |    —     | —                                                 | Same.                                                                              |
-| `SMTP_HOST`             |    —     | `smtp.resend.com`                                 | Enables invitation emails. If unset, invite still creates a link — email is skipped with a console warning. |
+| `BREVO_API_KEY`         |    —     | `xkeysib-...`                                     | **Used in production.** When set, the mailer sends through Brevo's HTTP API (required on Railway — see notes below) and the `SMTP_*` vars are ignored. |
+| `SMTP_HOST`             |    —     | `smtp.gmail.com`                                  | Local-dev fallback (Nodemailer). If neither Brevo nor SMTP is configured, invite still creates a link and the email step is skipped with a console warning. |
 | `SMTP_PORT`             |    —     | `587`                                             | `465` for TLS, `587`/`2525` for STARTTLS.                                          |
 | `SMTP_SECURE`           |    —     | `false`                                           | `true` only for port 465.                                                          |
 | `SMTP_USER`             |    —     | —                                                 | SMTP username / API key.                                                           |
 | `SMTP_PASS`             |    —     | —                                                 | SMTP password / API secret.                                                        |
-| `MAIL_FROM`             |    —     | `noreply@yourdomain.com`                          | Defaults to `SMTP_USER` if unset.                                                  |
+| `MAIL_FROM`             |    —     | `noreply@yourdomain.com`                          | Sender address. Required when using Brevo; defaults to `SMTP_USER` for the SMTP path. Must match a verified Brevo sender. |
 | `MAIL_FROM_NAME`        |    —     | `Team Hub`                                        | Display name on the `From:` header.                                                |
 
 ### Frontend — `apps/web/.env.local`
@@ -220,7 +221,10 @@ The web app stays usable when the network drops: GET responses are cached, mutat
 ### Bonus features also implemented
 
 - **Dark / light theme** with system-preference detection (`themeStore.js`, `ThemeProvider`, `ThemeScript`, `ThemeToggle`).
-- **Email notifications** — invitation emails and mentions sent via Nodemailer (`apps/api/src/services/mailer.js`) with a fully styled HTML template. The mailer is lazy: if SMTP env vars are missing the API still boots and invite creation still succeeds — the email step is skipped with a console warning, so local dev stays frictionless.
+- **Email notifications** — invitation emails and mentions sent from `apps/api/src/services/mailer.js` with a fully styled HTML template. The mailer has two backends and picks one at runtime:
+  - **Brevo HTTP API** (production on Railway) — used when `BREVO_API_KEY` is set. Railway blocks outbound SMTP ports (25 / 465 / 587), so direct Gmail SMTP via Nodemailer is unreachable from the deployed API; Brevo's HTTPS API sidesteps that entirely. Free tier covers 300 sends/day, which is plenty for this project.
+  - **Nodemailer + SMTP** (local dev fallback) — used when `BREVO_API_KEY` is empty but `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` are set.
+  - **No-op** — if neither is configured, invite creation still succeeds and the link is shown to the inviter; only the email send is skipped, with a console warning. Keeps local dev frictionless.
 - **Swagger / OpenAPI** docs served at `/api/docs`, generated from JSDoc on the route files (`swagger-jsdoc` + `swagger-ui-express`).
 - **Unit & integration tests** — Jest + Supertest on the API (`apps/api/src/**/__tests__`), React Testing Library on the web (`apps/web/src/**/__tests__`). Run with `pnpm test` or `pnpm test:coverage`.
 
@@ -252,7 +256,7 @@ railway run --service api pnpm db:seed
 
 ## Known Limitations
 
-- **Invitation emails require SMTP credentials.** If `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` are not set, the invite row is still created and the link is shown in the inviter's modal, but no email is sent (a console warning is logged). This keeps local dev frictionless.
+- **Invitation emails require a configured mail backend.** Production uses **Brevo** (`BREVO_API_KEY`) because Railway blocks outbound SMTP ports, so Nodemailer pointed at Gmail SMTP cannot connect from a deployed service. Local dev can use either Brevo or plain SMTP. If neither is configured, the invite row is still created and the link is shown in the inviter's modal, but no email is sent (a console warning is logged) — local dev stays frictionless.
 - **Avatar uploads require Cloudinary credentials.** Without them, avatar upload returns 500; the rest of the app works fine and falls back to initials.
 
 - **Real-time collaborative editing on goal descriptions is not implemented.** Three advanced features were built (Optimistic UI, Audit Log, Offline Support); live multi-cursor editing would have required Yjs or similar.

@@ -30,6 +30,7 @@ const Select = forwardRef(function Select(
           className={clsx(
             "w-full bg-transparent text-ink appearance-none pr-7 py-2 text-[14px]",
             "border-0 border-b transition-colors outline-none cursor-pointer",
+            "[&>option]:bg-paper [&>option]:text-ink",
             error
               ? "border-ember-500 focus:border-ember-600"
               : "border-ink/20 hover:border-ink/45 focus:border-ink"
