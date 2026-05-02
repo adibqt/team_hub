@@ -1,18 +1,17 @@
 import nodemailer from "nodemailer";
 import dns from "node:dns";
-import { Resend } from "resend";
 import { env } from "../config/env.js";
 
 /* ────────────────────────────────────────────────────────────────
    Two backends:
-     • Resend (HTTP) — used when RESEND_API_KEY is set. Required on
+     • Brevo (HTTP) — used when BREVO_API_KEY is set. Required on
        Railway and other PaaS that block outbound SMTP ports.
      • Nodemailer / SMTP — fallback for local dev or self-hosted.
    If neither is configured, every send becomes a no-op + warning.
    ──────────────────────────────────────────────────────────────── */
 
-function useResend() {
-  return Boolean(env.RESEND_API_KEY);
+function useBrevo() {
+  return Boolean(env.BREVO_API_KEY);
 }
 
 function useSmtp() {
@@ -20,18 +19,52 @@ function useSmtp() {
 }
 
 function isMailEnabled() {
-  return useResend() || useSmtp();
+  return useBrevo() || useSmtp();
 }
 
-// ── Resend ────────────────────────────────────────────────────────
-let resend = null;
-function getResend() {
-  if (!useResend()) return null;
-  if (!resend) {
-    resend = new Resend(env.RESEND_API_KEY);
-    console.log("[mailer] Resend ready");
+// ── Brevo ────────────────────────────────────────────────────────
+// Parse "Display Name <addr@host>" or plain "addr@host" → { name?, email }
+function parseAddress(input) {
+  if (!input) return null;
+  const m = String(input).match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+  if (m) return { name: m[1].trim() || undefined, email: m[2].trim() };
+  return { email: String(input).trim() };
+}
+
+let brevoLoggedReady = false;
+async function brevoSend({ from, to, subject, text, html, replyTo }) {
+  const sender = parseAddress(from);
+  if (!sender) throw new Error("MAIL_FROM is required when using Brevo");
+
+  const body = {
+    sender,
+    to: [parseAddress(to)],
+    subject,
+    htmlContent: html,
+    textContent: text,
+  };
+  if (replyTo) body.replyTo = parseAddress(replyTo);
+
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": env.BREVO_API_KEY,
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Brevo ${res.status}: ${detail || res.statusText}`);
   }
-  return resend;
+  if (!brevoLoggedReady) {
+    console.log("[mailer] Brevo ready");
+    brevoLoggedReady = true;
+  }
+  const data = await res.json().catch(() => ({}));
+  return { messageId: data.messageId };
 }
 
 // ── SMTP (fallback) ──────────────────────────────────────────────
@@ -79,20 +112,8 @@ function fromAddress() {
  * `{ messageId }` on success, throws on failure.
  */
 async function deliver({ to, subject, text, html, replyTo }) {
-  if (useResend()) {
-    const from = fromAddress();
-    if (!from) throw new Error("MAIL_FROM is required when using Resend");
-    const r = getResend();
-    const { data, error } = await r.emails.send({
-      from,
-      to,
-      subject,
-      text,
-      html,
-      reply_to: replyTo || undefined,
-    });
-    if (error) throw new Error(error.message || String(error));
-    return { messageId: data?.id };
+  if (useBrevo()) {
+    return brevoSend({ from: fromAddress(), to, subject, text, html, replyTo });
   }
 
   const t = getTransporter();

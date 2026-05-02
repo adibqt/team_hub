@@ -12,10 +12,10 @@ export const env = {
   CLIENT_URL: process.env.CLIENT_URL || "http://localhost:3000",
 
   // ── Mail ───────────────────────────────────────────────────────
-  // Preferred: Resend HTTP API (works on Railway, which blocks SMTP).
-  // If RESEND_API_KEY is set, the mailer uses it and ignores SMTP_*.
+  // Preferred: Brevo HTTP API (works on Railway, which blocks SMTP).
+  // If BREVO_API_KEY is set, the mailer uses it and ignores SMTP_*.
   // Otherwise it falls back to nodemailer + SMTP for local dev.
-  RESEND_API_KEY: process.env.RESEND_API_KEY || "",
+  BREVO_API_KEY: process.env.BREVO_API_KEY || "",
 
   SMTP_HOST: process.env.SMTP_HOST || "",
   SMTP_PORT: Number(process.env.SMTP_PORT) || 587,
