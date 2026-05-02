@@ -1,4 +1,7 @@
 import http from "http";
+import dns from "node:dns";
+// Railway egress doesn't route IPv6 — prefer A records everywhere.
+dns.setDefaultResultOrder("ipv4first");
 import { Server } from "socket.io";
 import app from "./app.js";
 import { registerSocketHandlers } from "./sockets/index.js";

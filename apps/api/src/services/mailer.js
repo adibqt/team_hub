@@ -1,5 +1,17 @@
 import nodemailer from "nodemailer";
+import dns from "node:dns";
 import { env } from "../config/env.js";
+
+// Railway's egress doesn't route IPv6. Force every DNS lookup the mailer
+// performs through here to return only A (IPv4) records, so smtp.gmail.com
+// never resolves to an unreachable AAAA address.
+function ipv4Lookup(hostname, options, callback) {
+  if (typeof options === "function") {
+    callback = options;
+    options = {};
+  }
+  return dns.lookup(hostname, { ...options, family: 4 }, callback);
+}
 
 /* ────────────────────────────────────────────────────────────────
    Transporter — built lazily so the API can boot without SMTP
@@ -23,9 +35,9 @@ function getTransporter() {
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE, // true for 465, false for 587/2525
     auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-    // Railway's egress network doesn't route IPv6. Force IPv4 lookups so
-    // smtp.gmail.com doesn't resolve to a AAAA record we can't reach.
     family: 4,
+    tls: { family: 4, lookup: ipv4Lookup },
+    lookup: ipv4Lookup,
   });
 
   // Verify once on first use; surface auth/host issues early in dev logs.
