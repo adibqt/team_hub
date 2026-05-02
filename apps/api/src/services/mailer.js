@@ -23,6 +23,9 @@ function getTransporter() {
     port: env.SMTP_PORT,
     secure: env.SMTP_SECURE, // true for 465, false for 587/2525
     auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+    // Railway's egress network doesn't route IPv6. Force IPv4 lookups so
+    // smtp.gmail.com doesn't resolve to a AAAA record we can't reach.
+    family: 4,
   });
 
   // Verify once on first use; surface auth/host issues early in dev logs.
